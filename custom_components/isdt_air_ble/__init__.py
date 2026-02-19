@@ -1,40 +1,52 @@
+"""The ISDT C4 Air integration."""
+
 import logging
+
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.const import Platform
+from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
-from .coordinator import ISDTDataUpdateCoordinator  # Diese Datei erstellen wir gleich
+from .coordinator import ISDTDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# Liste der Plattformen, die wir unterstützen (vorerst nur Sensoren)
-PLATFORMS: list[Platform] = [Platform.SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SWITCH]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Setzt die Integration nach erfolgreichem Config Flow auf."""
+    """Set up ISDT C4 Air from a config entry."""
     address = entry.data["address"]
+    model = entry.data.get("model", "C4 Air")
 
-    # 1. Den Coordinator erstellen (das Herzstück der Kommunikation)
-    coordinator = ISDTDataUpdateCoordinator(hass, address)
+    coordinator = ISDTDataUpdateCoordinator(hass, address, model)
 
-    # 2. Den ersten Datenabruf versuchen
-    await coordinator.async_config_entry_first_refresh()
-
-    # 3. Den Coordinator zentral speichern, damit sensor.py darauf zugreifen kann
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    # 4. Die Plattformen (sensor.py) laden
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Start connection in the background (non-blocking)
+    async def _async_start_connection():
+        try:
+            await coordinator.async_start()
+            await coordinator.async_refresh()
+        except Exception as err:
+            _LOGGER.warning(
+                "Initial connection failed: %s - Will retry on next update", err
+            )
+
+    hass.async_create_task(_async_start_connection())
 
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Wird aufgerufen, wenn die Integration entfernt oder deaktiviert wird."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
+    """Unload a config entry."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    if unload_ok:
+        coordinator = hass.data[DOMAIN].pop(entry.entry_id)
+        await coordinator.async_shutdown()
 
     return unload_ok

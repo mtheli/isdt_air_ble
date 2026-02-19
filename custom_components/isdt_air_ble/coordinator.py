@@ -1,3 +1,5 @@
+"""Data update coordinator for ISDT C4 Air BLE charger."""
+
 import asyncio
 import logging
 from datetime import timedelta
@@ -7,307 +9,362 @@ from bleak_retry_connector import establish_connection
 
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.components import bluetooth
+from homeassistant.core import callback
+from homeassistant.util import dt as dt_util
+
+from .const import (
+    CHAR_UUID_AF01,
+    CHAR_UUID_AF02,
+    CMD_HARDWARE_INFO_REQ,
+    CMD_ALARM_TONE_REQ,
+    CMD_ELECTRIC_REQ,
+    CMD_WORKSTATE_REQ,
+    CMD_IR_REQ,
+)
+from .parser import parse_responses, parse_hardware_info
 
 _LOGGER = logging.getLogger(__name__)
 
-# WorkState Status Mapping
-WORK_STATE_MAP = {
-    0: "idle",
-    1: "unknown_1",  # Zu bestimmen
-    2: "done",
-    3: "charging",  # BESTÄTIGT: Orange mit Blitz in App
-    4: "unknown_4",  # Zu bestimmen
-    5: "error",
-}
-
-# Battery Type Mapping (aus C4AirModel.java setChemistryCapacity)
-BATTERY_TYPE_MAP = {
-    0: "LiHV",  # 4.35V Lithium High Voltage
-    1: "LiIon",  # 4.20V Standard Lithium-Ion
-    2: "LiFe",  # 3.65V Lithium Iron Phosphate (LiFePO4)
-    3: "NiZn",  # Nickel-Zinc
-    4: "NiMH/Cd",  # Nickel Metal Hydride / Cadmium
-    5: "LiIon",  # 1.50V Lithium-Ion (spezielle Variante)
-    6: "Auto",  # Automatische Erkennung
-}
-
 
 class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
-    """Klasse zur Verwaltung der Datenabfrage vom C4 Air."""
+    """Coordinator for polling data from the ISDT C4 Air via persistent BLE connection."""
 
-    def __init__(self, hass, address):
+    def __init__(self, hass, address, model="C4 Air"):
         super().__init__(
             hass,
             _LOGGER,
-            name="ISDT C4 Air",
+            name=f"ISDT {model}",
             update_interval=timedelta(seconds=30),
         )
         self.address = address
-        self.data = {}  # Struktur: {channel: {key: value, ...}}
+        self.model = model
+        self.data = {}  # Structure: {channel: {key: value, ...}, "_device": {...}}
 
-    async def _async_update_data(self):
-        """Daten vom Lader abrufen – pro Channel abfragen."""
+        # Hardware info (populated once after first connect)
+        self.hw_version: str | None = None
+        self.sw_version: str | None = None
+        self.serial_number: str | None = None
+        self._hw_info_fetched = False
+        self._device_registry_updated = False
+
+        # Alarm tone state
+        self._alarm_tone_on: bool | None = None
+
+        # Persistent BLE connection
+        self._client: BleakClient | None = None
+        self._connected = False
+        self._response_queue = asyncio.Queue(maxsize=100)
+        self._notification_started = False
+
+    async def async_start(self):
+        """Called on coordinator start - establish connection."""
+        _LOGGER.info("Starting ISDT C4 Air coordinator with persistent connection")
+        await self._ensure_connected()
+
+    async def async_shutdown(self):
+        """Called on shutdown - disconnect."""
+        _LOGGER.info("Shutting down ISDT C4 Air coordinator")
+        await self._disconnect()
+
+    # ------------------------------------------------------------------
+    # Connection management
+    # ------------------------------------------------------------------
+
+    async def _ensure_connected(self):
+        """Ensure BLE connection is established."""
+        if self._client and self._client.is_connected:
+            if self._notification_started:
+                _LOGGER.debug("Already connected and notifications active")
+                return
+            else:
+                _LOGGER.warning(
+                    "Client says connected but notifications not active - reconnecting"
+                )
+                await self._disconnect()
+
+        _LOGGER.debug("Establishing persistent connection to %s", self.address)
+
         ble_device = bluetooth.async_ble_device_from_address(
             self.hass, self.address, connectable=True
         )
         if not ble_device:
-            raise UpdateFailed(f"Gerät {self.address} nicht gefunden")
-
-        client: BleakClient | None = None
+            raise UpdateFailed(f"Device {self.address} not found")
 
         try:
-            # Establish a connection
-            client = await establish_connection(
+            self._client = await establish_connection(
                 BleakClient, ble_device, "ISDT C4 Air", timeout=15
             )
 
-            # Ensure services are discovered
-            if not client.services:
-                _LOGGER.debug("Services not discovered yet, discovering...")
-                await client.get_services()
-                _LOGGER.debug(
-                    "Services discovered: %d services found",
-                    len(client.services.services),
-                )
+            _LOGGER.debug(
+                "Connected, services available: %d",
+                len(self._client.services.services),
+            )
 
-            char_uuid = "0000af01-0000-1000-8000-00805f9b34fb"
+            await asyncio.sleep(1.0)
 
-            response_queue = asyncio.Queue()
+            await self._setup_notifications()
 
-            def callback(sender, data):
-                _LOGGER.debug("Notification empfangen: %s", data.hex(" "))
-                response_queue.put_nowait(data)
+            self._connected = True
+            _LOGGER.info("Persistent connection established to %s", self.address)
 
-            await client.start_notify(char_uuid, callback)
-
-            # Alle 6 Channels (0–5) abfragen
-            for channel in range(6):
-                # ElectricReq pro Channel (CMD 0xE4)
-                electric_req = bytearray([0x12, 0xE4, channel])
-                await client.write_gatt_char(char_uuid, electric_req, response=False)
-                await asyncio.sleep(0.4)
-
-                # ChargerWorkStateReq pro Channel (CMD 0xE6)
-                workstate_req = bytearray([0x13, 0xE6, channel])
-                await client.write_gatt_char(char_uuid, workstate_req, response=False)
-                await asyncio.sleep(0.4)
-
-            # Responses sammeln (mit Timeout)
-            responses = []
-            try:
-                while True:
-                    data = await asyncio.wait_for(response_queue.get(), timeout=5.0)
-                    responses.append(data)
-            except asyncio.TimeoutError:
-                pass
-
-            await client.stop_notify(char_uuid)
-
-            return self._parse_responses(responses)
+            # Fetch hardware info once after connection
+            if not self._hw_info_fetched:
+                await self._fetch_hardware_info()
 
         except Exception as err:
-            raise UpdateFailed(f"Fehler bei der Kommunikation: {err}")
-        finally:
-            if client and client.is_connected:
-                await client.disconnect()
+            _LOGGER.error("Failed to establish connection: %s", err)
+            self._connected = False
+            self._client = None
+            raise
 
-    def _parse_responses(self, responses):
-        """Alle Responses parsen und pro Channel zuordnen."""
-        parsed = {ch: {} for ch in range(6)}
+    async def _setup_notifications(self):
+        """Set up BLE notifications for responses."""
+        if self._notification_started:
+            return
 
-        for raw in responses:
-            _LOGGER.debug("RAW DATA vom C4 Air: %s", raw.hex(" "))
+        if not self._client:
+            raise UpdateFailed("Client not connected, cannot setup notifications")
 
-            if len(raw) < 3:
-                continue
+        def disconnected_callback(client):
+            _LOGGER.warning(
+                "BLE device disconnected unexpectedly: %s (was connected: %s)",
+                self.address,
+                self._connected,
+            )
+            self._connected = False
+            self._notification_started = False
 
-            cmd = raw[1]
-            ch = raw[2]
+        self._client.set_disconnected_callback(disconnected_callback)
 
-            if cmd == 0xE5:  # ElectricResp
-                parsed[ch].update(self._parse_electric(raw))
-            elif cmd == 0xE7:  # ChargerWorkStateResp
-                parsed[ch].update(self._parse_workstate(raw))
-            else:
+        def notification_callback(sender, data):
+            _LOGGER.debug("Notification received: %s", data.hex(" "))
+            try:
+                self._response_queue.put_nowait(data)
+            except asyncio.QueueFull:
+                _LOGGER.warning("Response queue full, dropping packet")
+
+        await self._client.start_notify(CHAR_UUID_AF01, notification_callback)
+        self._notification_started = True
+
+        await asyncio.sleep(0.5)
+        _LOGGER.debug("Notifications started on %s", CHAR_UUID_AF01)
+
+    async def _disconnect(self):
+        """Disconnect from BLE device."""
+        if self._client and self._client.is_connected:
+            try:
+                if self._notification_started:
+                    await self._client.stop_notify(CHAR_UUID_AF01)
+                    self._notification_started = False
+                await self._client.disconnect()
+                _LOGGER.info("Disconnected from %s", self.address)
+            except Exception as err:
+                _LOGGER.error("Error disconnecting: %s", err)
+
+        self._client = None
+        self._connected = False
+
+    # ------------------------------------------------------------------
+    # Hardware info (one-time query after connect)
+    # ------------------------------------------------------------------
+
+    async def _fetch_hardware_info(self):
+        """Fetch hardware/firmware info from the device (once).
+
+        The manufacturer app sends HardwareInfoReq via characteristic AF02
+        (not AF01 which is used for normal polling commands).
+        """
+        hw_response = asyncio.Queue(maxsize=5)
+
+        def hw_notification_callback(sender, data):
+            _LOGGER.debug("AF02 notification (%d bytes): %s", len(data), data.hex(" "))
+            try:
+                hw_response.put_nowait(data)
+            except asyncio.QueueFull:
+                pass
+
+        try:
+            # Start notifications on AF02
+            await self._client.start_notify(
+                CHAR_UUID_AF02, hw_notification_callback
+            )
+            await asyncio.sleep(0.3)
+
+            _LOGGER.debug("Sending HardwareInfoReq on AF02: %s", CMD_HARDWARE_INFO_REQ.hex(" "))
+            await self._client.write_gatt_char(
+                CHAR_UUID_AF02, CMD_HARDWARE_INFO_REQ, response=False
+            )
+
+            # Wait for response
+            try:
+                data = await asyncio.wait_for(hw_response.get(), timeout=3.0)
                 _LOGGER.debug(
-                    "Unbekannter CMD 0x%02x für Channel %d: %s", cmd, ch, raw.hex(" ")
+                    "HardwareInfo raw response (%d bytes): %s",
+                    len(data),
+                    data.hex(" "),
+                )
+                result = parse_hardware_info(data)
+                if result:
+                    self.hw_version, self.sw_version, self.serial_number = result
+                self._hw_info_fetched = True
+                _LOGGER.info(
+                    "Hardware info: HW=%s, FW=%s, Serial=%s",
+                    self.hw_version,
+                    self.sw_version,
+                    self.serial_number,
+                )
+            except asyncio.TimeoutError:
+                _LOGGER.warning("Timeout waiting for HardwareInfoResp on AF02")
+                self._hw_info_fetched = True
+
+        except Exception as err:
+            _LOGGER.warning("Failed to fetch hardware info: %s", err)
+
+        finally:
+            # Stop AF02 notifications - we only need them once
+            try:
+                await self._client.stop_notify(CHAR_UUID_AF02)
+            except Exception:
+                pass
+
+    # ------------------------------------------------------------------
+    # RSSI / last seen
+    # ------------------------------------------------------------------
+
+    def _get_rssi(self) -> int | None:
+        """Get current RSSI from HA bluetooth scanner data."""
+        service_info = bluetooth.async_last_service_info(
+            self.hass, self.address, connectable=True
+        )
+        if service_info:
+            return service_info.rssi
+        return None
+
+    def _update_device_registry(self):
+        """Update device registry with hardware/firmware info."""
+        from homeassistant.helpers import device_registry as dr
+
+        if not self.hw_version and not self.sw_version:
+            return
+
+        registry = dr.async_get(self.hass)
+        device = registry.async_get_device(identifiers={("isdt_air_ble", self.address)})
+        if device is None:
+            return
+
+        updates = {}
+        if self.sw_version:
+            updates["sw_version"] = self.sw_version
+        if self.hw_version:
+            updates["hw_version"] = self.hw_version
+        if self.serial_number:
+            updates["serial_number"] = self.serial_number
+
+        if updates:
+            registry.async_update_device(device.id, **updates)
+            self._device_registry_updated = True
+            _LOGGER.info(
+                "Updated device registry: SW=%s, HW=%s, Serial=%s",
+                self.sw_version,
+                self.hw_version,
+                self.serial_number,
+            )
+
+    # ------------------------------------------------------------------
+    # Data update
+    # ------------------------------------------------------------------
+
+    async def _async_update_data(self):
+        """Poll data from the charger via persistent BLE connection."""
+        try:
+            await self._ensure_connected()
+
+            if not self._client or not self._client.is_connected:
+                raise UpdateFailed("Client not connected after ensure_connected")
+
+            # Drain stale responses
+            while not self._response_queue.empty():
+                try:
+                    self._response_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+
+            await self._client.write_gatt_char(
+                CHAR_UUID_AF01, CMD_ALARM_TONE_REQ, response=False
+            )
+            await asyncio.sleep(0.09)
+
+            # Query all 6 channels (90ms between commands like manufacturer app)
+            # Per channel: ElectricReq, WorkStateReq, IRReq (3 commands)
+            for channel in range(6):
+                if not self._client.is_connected:
+                    raise UpdateFailed(f"Connection lost at channel {channel}")
+
+                try:
+                    await self._client.write_gatt_char(
+                        CHAR_UUID_AF01, CMD_ELECTRIC_REQ + bytearray([channel]), response=False
+                    )
+                    await asyncio.sleep(0.09)
+
+                    await self._client.write_gatt_char(
+                        CHAR_UUID_AF01, CMD_WORKSTATE_REQ + bytearray([channel]), response=False
+                    )
+                    await asyncio.sleep(0.09)
+
+                    await self._client.write_gatt_char(
+                        CHAR_UUID_AF01, CMD_IR_REQ + bytearray([channel]), response=False
+                    )
+                    await asyncio.sleep(0.09)
+
+                except Exception as write_err:
+                    _LOGGER.error(
+                        "Write failed on channel %d: %s (is_connected=%s)",
+                        channel,
+                        write_err,
+                        self._client.is_connected if self._client else None,
+                    )
+                    raise UpdateFailed(f"Write failed: {write_err}")
+
+            # Collect responses (expect 19: 1 alarm tone + 6 channels × 3 commands)
+            expected_responses = 19
+            responses = []
+            try:
+                while len(responses) < expected_responses:
+                    data = await asyncio.wait_for(
+                        self._response_queue.get(), timeout=2.0
+                    )
+                    responses.append(data)
+            except asyncio.TimeoutError:
+                _LOGGER.debug(
+                    "Response timeout - got %d/%d responses",
+                    len(responses),
+                    expected_responses,
                 )
 
-        _LOGGER.info("Geparste Daten: %s", parsed)
-        return parsed
+            _LOGGER.debug("Received %d responses", len(responses))
 
-    def _parse_electric(self, data):
-        """ElectricResp parsen (Input/Output/Charge + Cell Voltages).
+            parsed, alarm_tone_on = parse_responses(responses)
+            self._alarm_tone_on = alarm_tone_on
 
-        Basierend auf ElectricResp.java:
-        - Unterstützt zwei Paketlängen: < 35 Bytes und > 35 Bytes
-        - Kurzes Paket: 2-Byte Voltages, 8 Zellen
-        - Langes Paket: 4-Byte Voltages, 16 Zellen
-        """
-        if len(data) < 15:
-            _LOGGER.warning("ElectricResp zu kurz: %d Bytes", len(data))
-            return {}
+            # Add device-level data (RSSI, last_seen)
+            parsed["_device"] = {
+                "rssi": self._get_rssi(),
+                "last_seen": dt_util.utcnow().isoformat(),
+            }
 
-        channel_id = data[2]
-        _LOGGER.debug(
-            "Parse ElectricResp für Channel %d, Länge: %d", channel_id, len(data)
-        )
+            # Fetch hardware info if not yet done (e.g. first connect failed)
+            if not self._hw_info_fetched:
+                await self._fetch_hardware_info()
 
-        # Input Voltage (variabel: 2 oder 4 Bytes)
-        if len(data) > 35:
-            # Langes Paket: 4 Bytes (data[3:7])
-            input_v = int.from_bytes(data[3:7], "little") / 1000.0
-            pos = 7
-        else:
-            # Kurzes Paket: 2 Bytes (data[3:5])
-            input_v = int.from_bytes(data[3:5], "little") / 1000.0
-            pos = 5
+            # Update device registry once when hw info is available
+            if self._hw_info_fetched and not self._device_registry_updated:
+                self._update_device_registry()
 
-        # Input Current (immer 4 Bytes)
-        input_a = int.from_bytes(data[pos : pos + 4], "little") / 1000.0
-        pos += 4
+            return parsed
 
-        # Output Voltage (variabel: 2 oder 4 Bytes)
-        if len(data) > 35:
-            # Langes Paket: 4 Bytes
-            output_v = int.from_bytes(data[pos : pos + 4], "little") / 1000.0
-            pos += 4
-        else:
-            # Kurzes Paket: 2 Bytes
-            output_v = int.from_bytes(data[pos : pos + 2], "little") / 1000.0
-            pos += 2
+        except Exception as err:
+            _LOGGER.error("Error during update: %s", err)
+            self._connected = False
+            await self._disconnect()
+            raise UpdateFailed(f"Communication error: {err}")
 
-        # Charging Current (immer 4 Bytes)
-        charge_a = int.from_bytes(data[pos : pos + 4], "little") / 1000.0
-        pos += 4
-
-        # Cell Voltages parsen (8 oder 16 Zellen à 2 Bytes)
-        cell_voltages = []
-        num_cells = 16 if len(data) >= 35 else 8
-
-        for i in range(num_cells):
-            if pos + 2 <= len(data):
-                cell_v = int.from_bytes(data[pos : pos + 2], "little") / 1000.0
-                cell_voltages.append(cell_v)
-                pos += 2
-            else:
-                break
-
-        result = {
-            "channel_id": channel_id,
-            "input_voltage": input_v,
-            "input_current": input_a,
-            "output_voltage": output_v,
-            "charging_current": charge_a,
-            "cell_voltages": cell_voltages,
-        }
-
-        _LOGGER.debug(
-            "Channel %d: In=%.2fV/%.3fA, Out=%.2fV, Charge=%.3fA, Cells=%d",
-            channel_id,
-            input_v,
-            input_a,
-            output_v,
-            charge_a,
-            len([c for c in cell_voltages if c > 0]),
-        )
-
-        return result
-
-    def _parse_workstate(self, data):
-        """ChargerWorkStateResp parsen (Status, Kapazität, Zeit, etc.)."""
-        if len(data) < 38:
-            _LOGGER.warning("WorkStateResp zu kurz: %d Bytes", len(data))
-            return {}
-
-        channel_id = data[2]
-        _LOGGER.debug("Parse WorkStateResp für Channel %d", channel_id)
-
-        # Status und Prozent
-        work_state = data[3]
-        capacity_percentage = data[4]
-
-        # Kapazität in mAh (direkt, KEINE Division!)
-        capacity_done = int.from_bytes(data[5:9], "little")
-
-        # Energie in mWh
-        energy_done = int.from_bytes(data[9:13], "little")
-
-        # Ladezeit in Millisekunden (!) → Sekunden
-        work_period_ms = int.from_bytes(data[13:17], "little")
-        work_period = work_period_ms // 1000  # Konvertiere zu Sekunden
-
-        # Akkutyp und Konfiguration
-        battery_type = data[17]
-        unit_serials_num = data[18]
-        link_type = data[19]
-
-        # Spannungen und Ströme
-        full_charged_volt = int.from_bytes(data[20:22], "little") / 1000.0  # mV → V
-        work_current = int.from_bytes(data[22:26], "little") / 1000.0  # mA → A
-
-        # Akkuanzahl
-        charging_battery_num_whole = int.from_bytes(data[26:28], "little")
-        charging_battery_num_current = int.from_bytes(data[28:30], "little")
-
-        # Limits
-        min_input_volt = int.from_bytes(data[30:32], "little") / 1000.0  # mV → V
-        max_output_power = int.from_bytes(data[32:36], "little") / 1000.0  # mW → W
-
-        # Fehlercode
-        error_code = int.from_bytes(data[36:38], "little")
-
-        # Optional: Parallel State
-        parallel_state = None
-        if len(data) > 38:
-            parallel_state = data[38] == 1
-
-        # Status-String
-        work_state_str = WORK_STATE_MAP.get(work_state, f"unknown_{work_state}")
-        battery_type_str = BATTERY_TYPE_MAP.get(battery_type, f"unknown_{battery_type}")
-
-        # Zeit formatieren (HH:MM:SS)
-        hours = work_period // 3600
-        minutes = (work_period % 3600) // 60
-        seconds = work_period % 60
-        work_period_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-
-        # Energie in Wh umrechnen
-        energy_done_wh = energy_done / 1000.0
-
-        result = {
-            "work_state": work_state,
-            "work_state_str": work_state_str,
-            "capacity_percentage": capacity_percentage,
-            "capacity_done": capacity_done,  # mAh
-            "energy_done": energy_done,  # mWh
-            "energy_done_wh": energy_done_wh,  # Wh
-            "work_period": work_period,  # Sekunden
-            "work_period_ms": work_period_ms,  # Millisekunden (für Debug)
-            "work_period_str": work_period_str,  # HH:MM:SS
-            "battery_type": battery_type,
-            "battery_type_str": battery_type_str,
-            "unit_serials_num": unit_serials_num,
-            "link_type": link_type,
-            "full_charged_volt": full_charged_volt,
-            "work_current": work_current,
-            "charging_battery_num_whole": charging_battery_num_whole,
-            "charging_battery_num_current": charging_battery_num_current,
-            "min_input_volt": min_input_volt,
-            "max_output_power": max_output_power,
-            "error_code": error_code,
-            "parallel_state": parallel_state,
-        }
-
-        _LOGGER.debug(
-            "Channel %d: State=%s, %d%%, %d mAh, %s (ms=%d), Type=%s",
-            channel_id,
-            work_state_str,
-            capacity_percentage,
-            capacity_done,
-            work_period_str,
-            work_period_ms,
-            battery_type_str,
-        )
-
-        return result
