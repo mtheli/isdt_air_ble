@@ -27,7 +27,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Start connection in the background (non-blocking)
+    # Start connection in the background (non-blocking, tied to entry lifecycle)
     async def _async_start_connection():
         try:
             await coordinator.async_start()
@@ -37,7 +37,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "Initial connection failed: %s - Will retry on next update", err
             )
 
-    hass.async_create_task(_async_start_connection())
+    entry.async_create_background_task(
+        hass, _async_start_connection(), "isdt_air_ble_initial_connection"
+    )
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 

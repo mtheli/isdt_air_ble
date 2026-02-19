@@ -14,42 +14,12 @@ from homeassistant.const import (
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
 )
-from homeassistant.helpers.device_registry import (
-    DeviceInfo,
-    CONNECTION_BLUETOOTH,
-)
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .helpers import main_device_info, slot_device_info
 
 _LOGGER = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Device info helpers
-# ---------------------------------------------------------------------------
-
-
-def _main_device_info(address: str, model: str = "C4 Air") -> DeviceInfo:
-    """Device info for the main ISDT device."""
-    return DeviceInfo(
-        identifiers={(DOMAIN, address)},
-        connections={(CONNECTION_BLUETOOTH, address)},
-        name=f"ISDT {model}",
-        manufacturer="ISDT",
-        model=model,
-    )
-
-
-def _slot_device_info(address: str, slot: int, model: str = "C4 Air") -> DeviceInfo:
-    """Device info for a slot sub-device."""
-    return DeviceInfo(
-        identifiers={(DOMAIN, f"{address}_slot{slot}")},
-        name=f"ISDT {model} Slot {slot}",
-        manufacturer="ISDT",
-        model=model,
-        via_device=(DOMAIN, address),
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -192,9 +162,9 @@ class ISDTC4AirSensorBase(CoordinatorEntity, SensorEntity):
         self._attr_translation_key = translation_key
 
         if slot is not None:
-            self._attr_device_info = _slot_device_info(address, slot, model)
+            self._attr_device_info = slot_device_info(address, slot, model)
         else:
-            self._attr_device_info = _main_device_info(address, model)
+            self._attr_device_info = main_device_info(address, model)
 
     @property
     def native_value(self):
@@ -276,7 +246,7 @@ class ISDTC4CapacitySensor(ISDTC4AirSensorBase):
     """Charged capacity sensor (mAh)."""
 
     _attr_native_unit_of_measurement = "mAh"
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:battery-plus"
     _attr_suggested_display_precision = 0
 
@@ -286,14 +256,28 @@ class ISDTC4EnergySensor(ISDTC4AirSensorBase):
 
     _attr_native_unit_of_measurement = UnitOfEnergy.WATT_HOUR
     _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 2
 
 
 class ISDTC4TimeSensor(ISDTC4AirSensorBase):
-    """Charge time sensor (HH:MM:SS string)."""
+    """Charge time as timestamp (charging start time), live-updating via frontend."""
 
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_icon = "mdi:timer-outline"
+
+    @property
+    def native_value(self):
+        """Return charging start time computed from work_period."""
+        if not self.coordinator.data or self._channel not in self.coordinator.data:
+            return None
+        from homeassistant.util import dt as dt_util
+        from datetime import timedelta
+        ch = self.coordinator.data[self._channel]
+        work_period = ch.get("work_period", 0) or 0
+        if work_period <= 0:
+            return None
+        return dt_util.utcnow() - timedelta(seconds=work_period)
 
 
 class ISDTC4BatteryTypeSensor(ISDTC4AirSensorBase):
@@ -411,9 +395,5 @@ class ISDTC4LastSeenSensor(ISDTC4AirSensorBase):
     def native_value(self):
         """Return last seen timestamp as datetime."""
         if self.coordinator.data and "_device" in self.coordinator.data:
-            iso_str = self.coordinator.data["_device"].get("last_seen")
-            if iso_str:
-                from datetime import datetime
-
-                return datetime.fromisoformat(iso_str)
+            return self.coordinator.data["_device"].get("last_seen")
         return None

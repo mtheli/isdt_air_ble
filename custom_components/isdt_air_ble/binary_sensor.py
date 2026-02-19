@@ -6,26 +6,12 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.helpers.device_registry import (
-    DeviceInfo,
-    CONNECTION_BLUETOOTH,
-)
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .helpers import main_device_info
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _main_device_info(address: str, model: str = "C4 Air") -> DeviceInfo:
-    """Device info for the main ISDT device."""
-    return DeviceInfo(
-        identifiers={(DOMAIN, address)},
-        connections={(CONNECTION_BLUETOOTH, address)},
-        name=f"ISDT {model}",
-        manufacturer="ISDT",
-        model=model,
-    )
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -56,7 +42,7 @@ class ISDTC4SlotActiveSensor(CoordinatorEntity, BinarySensorEntity):
 
         self._attr_unique_id = f"{address}_slot{slot}_active"
         self._attr_translation_placeholders = {"slot": str(slot)}
-        self._attr_device_info = _main_device_info(address, model)
+        self._attr_device_info = main_device_info(address, model)
 
     @property
     def is_on(self):

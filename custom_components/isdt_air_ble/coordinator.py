@@ -67,6 +67,19 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         _LOGGER.info("Shutting down ISDT C4 Air coordinator")
         await self._disconnect()
 
+    async def async_set_alarm_tone(self, enable: bool) -> None:
+        """Send alarm tone command to the charger.
+
+        AlarmToneTaskReq: [0x13, 0x9C, task_type]
+        task_type: 0x01 = on, 0x00 = off.
+        """
+        await self._ensure_connected()
+        task_type = 0x01 if enable else 0x00
+        cmd = bytearray([0x13, 0x9C, task_type])
+        await self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False)
+        self._alarm_tone_on = enable
+        _LOGGER.info("Alarm tone %s", "enabled" if enable else "disabled")
+
     # ------------------------------------------------------------------
     # Connection management
     # ------------------------------------------------------------------
@@ -353,7 +366,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             # Add device-level data (RSSI, last_seen)
             parsed["_device"] = {
                 "rssi": self._get_rssi(),
-                "last_seen": dt_util.utcnow().isoformat(),
+                "last_seen": dt_util.utcnow(),
             }
 
             # Fetch hardware info if not yet done (e.g. first connect failed)
