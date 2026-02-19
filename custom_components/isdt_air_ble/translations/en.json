@@ -49,6 +49,7 @@
       "status": {
         "name": "Status",
         "state": {
+          "empty": "Empty",
           "idle": "Idle",
           "charging": "Charging",
           "done": "Done",

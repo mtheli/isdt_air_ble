@@ -228,12 +228,34 @@ class ISDTC4CurrentSensor(ISDTC4AirSensorBase):
 
 
 class ISDTC4StatusSensor(ISDTC4AirSensorBase):
-    """Charging status sensor (idle, charging, done, error, …)."""
+    """Charging status sensor (empty, idle, charging, done, error)."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["empty", "idle", "charging", "done", "error"]
+
+    @property
+    def native_value(self):
+        """Return slot status, distinguishing empty from idle."""
+        if not self.coordinator.data or self._channel not in self.coordinator.data:
+            return None
+        ch = self.coordinator.data[self._channel]
+        state = ch.get("work_state_str")
+        if state != "idle":
+            return state
+        # Slot is idle – check if a battery is actually present
+        output_v = ch.get("output_voltage", 0.0) or 0.0
+        capacity = ch.get("capacity_percentage", 0) or 0
+        cell_voltages = ch.get("cell_voltages") or []
+        has_cell = any(v > 0.1 for v in cell_voltages)
+        if output_v > 0.5 or capacity > 0 or has_cell:
+            return "idle"
+        return "empty"
 
     @property
     def icon(self):
         """Dynamic icon based on charging status."""
         icons = {
+            "empty": "mdi:battery-off-outline",
             "charging": "mdi:battery-charging",
             "done": "mdi:battery-check",
             "error": "mdi:battery-alert",
