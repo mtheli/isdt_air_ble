@@ -1,11 +1,12 @@
 """Config flow for ISDT C4 Air integration."""
 
 from typing import Any
+import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow, ConfigEntry
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 
-from .const import DOMAIN, ISDT_MANUFACTURER_ID, DEVICE_MODEL_MAP
+from .const import DOMAIN, ISDT_MANUFACTURER_ID, DEVICE_MODEL_MAP, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
 
 
 def _detect_model(discovery_info: BluetoothServiceInfoBleak) -> str:
@@ -26,10 +27,40 @@ def _detect_model(discovery_info: BluetoothServiceInfoBleak) -> str:
     return "ISDT Device"
 
 
+class ISDTOptionsFlow(OptionsFlow):
+    """Handle options for ISDT chargers."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show the options form."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        current_interval = self.config_entry.options.get(
+            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+        )
+
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_SCAN_INTERVAL, default=current_interval): vol.All(
+                    vol.Coerce(int), vol.Range(min=10, max=300)
+                ),
+            }
+        )
+
+        return self.async_show_form(step_id="init", data_schema=schema)
+
+
 class ISDTConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle the config flow for ISDT chargers."""
 
     VERSION = 1
+
+    @staticmethod
+    def async_get_options_flow(config_entry: ConfigEntry) -> ISDTOptionsFlow:
+        """Return the options flow handler."""
+        return ISDTOptionsFlow()
 
     def __init__(self):
         super().__init__()

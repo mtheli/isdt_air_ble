@@ -1,0 +1,104 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up ISDT Charger",
+        "description": "Confirm the detected ISDT charger to add it to Home Assistant."
+      }
+    },
+    "abort": {
+      "already_configured": "Device is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "ISDT Charger Options",
+        "data": {
+          "scan_interval": "Poll interval (seconds)"
+        },
+        "data_description": {
+          "scan_interval": "How often the charger is queried via Bluetooth (10–300 seconds)."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "input_voltage": {
+        "name": "Input Voltage"
+      },
+      "input_current": {
+        "name": "Input Current"
+      },
+      "total_charging_current": {
+        "name": "Total Charging Current"
+      },
+      "rssi": {
+        "name": "Signal Strength"
+      },
+      "last_seen": {
+        "name": "Last Seen"
+      },
+      "output_voltage": {
+        "name": "Output Voltage"
+      },
+      "charging_current": {
+        "name": "Charging Current"
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "idle": "Idle",
+          "charging": "Charging",
+          "done": "Done",
+          "error": "Error"
+        }
+      },
+      "capacity": {
+        "name": "Capacity"
+      },
+      "capacity_done": {
+        "name": "Capacity Charged"
+      },
+      "energy_done": {
+        "name": "Energy Charged"
+      },
+      "charge_time": {
+        "name": "Charge Time"
+      },
+      "battery_type": {
+        "name": "Battery Type"
+      },
+      "internal_resistance": {
+        "name": "Internal Resistance"
+      },
+      "cell_1": { "name": "Cell 1 Voltage" },
+      "cell_2": { "name": "Cell 2 Voltage" },
+      "cell_3": { "name": "Cell 3 Voltage" },
+      "cell_4": { "name": "Cell 4 Voltage" },
+      "cell_5": { "name": "Cell 5 Voltage" },
+      "cell_6": { "name": "Cell 6 Voltage" },
+      "cell_7": { "name": "Cell 7 Voltage" },
+      "cell_8": { "name": "Cell 8 Voltage" },
+      "cell_9": { "name": "Cell 9 Voltage" },
+      "cell_10": { "name": "Cell 10 Voltage" },
+      "cell_11": { "name": "Cell 11 Voltage" },
+      "cell_12": { "name": "Cell 12 Voltage" },
+      "cell_13": { "name": "Cell 13 Voltage" },
+      "cell_14": { "name": "Cell 14 Voltage" },
+      "cell_15": { "name": "Cell 15 Voltage" },
+      "cell_16": { "name": "Cell 16 Voltage" }
+    },
+    "binary_sensor": {
+      "slot_charging": {
+        "name": "Slot {slot} Charging"
+      }
+    },
+    "switch": {
+      "beep": {
+        "name": "Beep"
+      }
+    }
+  }
+}

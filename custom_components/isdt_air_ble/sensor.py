@@ -68,13 +68,13 @@ async def async_setup_entry(hass, entry, async_add_entities):
         [
             ISDTC4VoltageSensor(
                 coordinator,
-                "Input Voltage",
+                "input_voltage",
                 "input_voltage",
                 channel=0,
             ),
             ISDTC4CurrentSensor(
                 coordinator,
-                "Input Current",
+                "input_current",
                 "input_current",
                 channel=0,
             ),
@@ -92,63 +92,63 @@ async def async_setup_entry(hass, entry, async_add_entities):
             [
                 ISDTC4VoltageSensor(
                     coordinator,
-                    f"Slot {slot} Output Voltage",
+                    "output_voltage",
                     "output_voltage",
                     channel=ch,
                     slot=slot,
                 ),
                 ISDTC4CurrentSensor(
                     coordinator,
-                    f"Slot {slot} Charging Current",
+                    "charging_current",
                     "charging_current",
                     channel=ch,
                     slot=slot,
                 ),
                 ISDTC4StatusSensor(
                     coordinator,
-                    f"Slot {slot} Status",
+                    "status",
                     "work_state_str",
                     channel=ch,
                     slot=slot,
                 ),
                 ISDTC4BatterySensor(
                     coordinator,
-                    f"Slot {slot} Capacity",
+                    "capacity",
                     "capacity_percentage",
                     channel=ch,
                     slot=slot,
                 ),
                 ISDTC4CapacitySensor(
                     coordinator,
-                    f"Slot {slot} Capacity Done",
+                    "capacity_done",
                     "capacity_done",
                     channel=ch,
                     slot=slot,
                 ),
                 ISDTC4EnergySensor(
                     coordinator,
-                    f"Slot {slot} Energy Done",
+                    "energy_done",
                     "energy_done_wh",
                     channel=ch,
                     slot=slot,
                 ),
                 ISDTC4TimeSensor(
                     coordinator,
-                    f"Slot {slot} Charge Time",
+                    "charge_time",
                     "work_period_str",
                     channel=ch,
                     slot=slot,
                 ),
                 ISDTC4BatteryTypeSensor(
                     coordinator,
-                    f"Slot {slot} Battery Type",
+                    "battery_type",
                     "battery_type_str",
                     channel=ch,
                     slot=slot,
                 ),
                 ISDTC4IRSensor(
                     coordinator,
-                    f"Slot {slot} Internal Resistance",
+                    "internal_resistance",
                     "ir_mohm",
                     channel=ch,
                     slot=slot,
@@ -161,7 +161,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             entities.append(
                 ISDTC4CellVoltageSensor(
                     coordinator,
-                    f"Slot {slot} Cell {cell_idx + 1}",
+                    f"cell_{cell_idx + 1}",
                     channel=ch,
                     cell_index=cell_idx,
                     slot=slot,
@@ -179,7 +179,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class ISDTC4AirSensorBase(CoordinatorEntity, SensorEntity):
     """Base class for all ISDT C4 Air sensors."""
 
-    def __init__(self, coordinator, name_suffix, data_key, channel, slot=None):
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator, translation_key, data_key, channel, slot=None):
         super().__init__(coordinator)
         self._data_key = data_key
         self._channel = channel
@@ -187,7 +189,7 @@ class ISDTC4AirSensorBase(CoordinatorEntity, SensorEntity):
         model = coordinator.model
 
         self._attr_unique_id = f"{address}_ch{channel}_{data_key}"
-        self._attr_name = f"ISDT {model} {name_suffix}"
+        self._attr_translation_key = translation_key
 
         if slot is not None:
             self._attr_device_info = _slot_device_info(address, slot, model)
@@ -296,10 +298,10 @@ class ISDTC4CellVoltageSensor(ISDTC4AirSensorBase):
     _attr_suggested_display_precision = 3
     _attr_entity_registry_enabled_default = False
 
-    def __init__(self, coordinator, name_suffix, channel, cell_index, slot=None):
+    def __init__(self, coordinator, translation_key, channel, cell_index, slot=None):
         super().__init__(
             coordinator,
-            name_suffix,
+            translation_key,
             f"cell{cell_index}",
             channel,
             slot=slot,
@@ -336,7 +338,7 @@ class ISDTC4TotalChargingSensor(ISDTC4AirSensorBase):
     def __init__(self, coordinator):
         super().__init__(
             coordinator,
-            "Total Charging Current",
+            "total_charging_current",
             "total_charging_current",
             channel=0,
         )
@@ -364,7 +366,7 @@ class ISDTC4RSSISensor(ISDTC4AirSensorBase):
     _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator):
-        super().__init__(coordinator, "RSSI", "rssi", channel=0)
+        super().__init__(coordinator, "rssi", "rssi", channel=0)
 
     @property
     def native_value(self):
@@ -381,7 +383,7 @@ class ISDTC4LastSeenSensor(ISDTC4AirSensorBase):
     _attr_icon = "mdi:clock-check-outline"
 
     def __init__(self, coordinator):
-        super().__init__(coordinator, "Last Seen", "last_seen", channel=0)
+        super().__init__(coordinator, "last_seen", "last_seen", channel=0)
 
     @property
     def native_value(self):

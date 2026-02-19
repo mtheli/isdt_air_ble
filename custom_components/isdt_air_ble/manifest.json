@@ -6,7 +6,7 @@
   "dependencies": [],
   "codeowners": ["@mtheli"],
   "config_flow": true,
-  "options_flow": false,
+  "options_flow": true,
   "bluetooth": [
     { "service_uuid": "0000af00-0000-1000-8000-00805f9b34fb" }
   ],

@@ -20,6 +20,7 @@ from .const import (
     CMD_ELECTRIC_REQ,
     CMD_WORKSTATE_REQ,
     CMD_IR_REQ,
+    DEFAULT_SCAN_INTERVAL,
 )
 from .parser import parse_responses, parse_hardware_info
 
@@ -29,12 +30,12 @@ _LOGGER = logging.getLogger(__name__)
 class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
     """Coordinator for polling data from the ISDT C4 Air via persistent BLE connection."""
 
-    def __init__(self, hass, address, model="C4 Air"):
+    def __init__(self, hass, address, model="C4 Air", scan_interval=DEFAULT_SCAN_INTERVAL):
         super().__init__(
             hass,
             _LOGGER,
             name=f"ISDT {model}",
-            update_interval=timedelta(seconds=30),
+            update_interval=timedelta(seconds=scan_interval),
         )
         self.address = address
         self.model = model
@@ -72,6 +73,8 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _ensure_connected(self):
         """Ensure BLE connection is established."""
+
+        # checking if already connected
         if self._client and self._client.is_connected:
             if self._notification_started:
                 _LOGGER.debug("Already connected and notifications active")
@@ -84,6 +87,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
 
         _LOGGER.debug("Establishing persistent connection to %s", self.address)
 
+        # getting device by address
         ble_device = bluetooth.async_ble_device_from_address(
             self.hass, self.address, connectable=True
         )
@@ -91,17 +95,17 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             raise UpdateFailed(f"Device {self.address} not found")
 
         try:
+            # Connecting to device
             self._client = await establish_connection(
                 BleakClient, ble_device, "ISDT C4 Air", timeout=15
             )
-
             _LOGGER.debug(
                 "Connected, services available: %d",
                 len(self._client.services.services),
             )
-
             await asyncio.sleep(1.0)
 
+            # setup notifications
             await self._setup_notifications()
 
             self._connected = True

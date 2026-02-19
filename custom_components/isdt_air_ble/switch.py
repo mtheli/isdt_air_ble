@@ -35,6 +35,8 @@ class ISDTC4AlarmToneSwitch(CoordinatorEntity, SwitchEntity):
     """Switch to toggle the alarm/beep tone on the charger."""
 
     _attr_icon = "mdi:volume-high"
+    _attr_has_entity_name = True
+    _attr_translation_key = "beep"
 
     def __init__(self, coordinator):
         super().__init__(coordinator)
@@ -42,7 +44,6 @@ class ISDTC4AlarmToneSwitch(CoordinatorEntity, SwitchEntity):
         model = coordinator.model
 
         self._attr_unique_id = f"{address}_alarm_tone"
-        self._attr_name = f"ISDT {model} Beep"
         self._attr_device_info = _main_device_info(address, model)
 
     @property

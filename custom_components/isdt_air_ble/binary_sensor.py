@@ -44,15 +44,18 @@ class ISDTC4SlotActiveSensor(CoordinatorEntity, BinarySensorEntity):
     """Binary sensor indicating whether a slot is actively charging."""
 
     _attr_device_class = BinarySensorDeviceClass.BATTERY_CHARGING
+    _attr_has_entity_name = True
+    _attr_translation_key = "slot_charging"
 
     def __init__(self, coordinator, slot, channel):
         super().__init__(coordinator)
         self._channel = channel
+        self._slot = slot
         address = coordinator.address
         model = coordinator.model
 
         self._attr_unique_id = f"{address}_slot{slot}_active"
-        self._attr_name = f"ISDT {model} Slot {slot}"
+        self._attr_translation_placeholders = {"slot": str(slot)}
         self._attr_device_info = _main_device_info(address, model)
 
     @property

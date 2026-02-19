@@ -1,5 +1,9 @@
 DOMAIN = "isdt_air_ble"
 
+# Options
+CONF_SCAN_INTERVAL = "scan_interval"
+DEFAULT_SCAN_INTERVAL = 30  # seconds
+
 # BLE GATT characteristic UUIDs
 CHAR_UUID_AF01 = "0000af01-0000-1000-8000-00805f9b34fb"  # Notify/Write (normal polling)
 CHAR_UUID_AF02 = "0000af02-0000-1000-8000-00805f9b34fb"  # Write (hardware info)
