@@ -46,6 +46,8 @@ The integration auto-detects the device model from BLE manufacturer data. Other 
 | Sensor | Type | Description |
 |--------|------|-------------|
 | Charging | Binary | Whether the slot is actively charging |
+| Battery Inserted | Binary (Plug) | Whether a battery is present in the slot |
+| Error | Binary (Problem) | Whether the slot has a charging error |
 | Output Voltage | Voltage (V) | Slot output voltage |
 | Charging Current | Current (A) | Slot charging current |
 | Capacity | Battery (%) | Current charge level |
@@ -91,7 +93,7 @@ After setup, you can adjust the **poll interval** via the integration options:
 1. Go to **Settings → Devices & Services**
 2. Find the ISDT charger entry
 3. Click **Configure**
-4. Set the poll interval (default: 30 seconds, range: 10–300)
+4. Set the poll interval (default: 10 seconds, range: 10–300)
 
 ## BLE Protocol
 
