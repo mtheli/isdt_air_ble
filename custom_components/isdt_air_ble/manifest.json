@@ -2,6 +2,8 @@
   "domain": "isdt_air_ble",
   "name": "ISDT C4 Air Charger",
   "version": "0.0.1",
+  "documentation": "https://github.com/mtheli/isdt_air_ble",
+  "issue_tracker": "https://github.com/mtheli/isdt_air_ble/issues",
   "requirements": ["bleak>=0.21.0", "bleak-retry-connector>=3.5.0"],
   "dependencies": [],
   "codeowners": ["@mtheli"],

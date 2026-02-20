@@ -79,7 +79,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
                     "status",
                     "work_state_str",
                     channel=ch,
-                    slot=slot,
+                    slot_number=slot,
                 ),
                 ISDTC4BatterySensor(
                     coordinator,
@@ -202,6 +202,11 @@ class ISDTC4StatusSensor(ISDTC4AirSensorBase):
 
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = ["empty", "idle", "charging", "done", "error"]
+
+    def __init__(self, coordinator, translation_key, data_key, channel, slot_number):
+        # Pass slot=None so it lands on the main device
+        super().__init__(coordinator, translation_key, data_key, channel, slot=None)
+        self._attr_translation_placeholders = {"slot": str(slot_number)}
 
     @property
     def native_value(self):

@@ -47,7 +47,7 @@
         "name": "Charging Current"
       },
       "status": {
-        "name": "Status",
+        "name": "Slot {slot} Status",
         "state": {
           "empty": "Empty",
           "idle": "Idle",
@@ -93,7 +93,13 @@
     },
     "binary_sensor": {
       "slot_charging": {
-        "name": "Slot {slot} Charging"
+        "name": "Charging"
+      },
+      "battery_inserted": {
+        "name": "Battery Inserted"
+      },
+      "slot_error": {
+        "name": "Error"
       }
     },
     "switch": {
