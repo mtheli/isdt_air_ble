@@ -64,6 +64,12 @@ The integration auto-detects the device model from BLE manufacturer data. Other 
 |--------|-------------|
 | Beep | Toggle the charger alarm/beep tone |
 
+## Screenshots
+
+| Config Flow | Device Overview | Slot Detail |
+|:-----------:|:---------------:|:-----------:|
+| ![Config Flow](images/config_flow.png) | ![Device Overview](images/device_overview.png) | ![Slot Detail](images/slot_detail.png) |
+
 ## Installation
 
 ### HACS (recommended)
