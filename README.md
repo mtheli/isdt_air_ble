@@ -5,6 +5,8 @@
 
 Custom Home Assistant integration for **ISDT chargers** with Bluetooth Low Energy (BLE) connectivity. Communicates directly with the charger via a persistent BLE connection — no cloud, no app required.
 
+![Device Overview](images/device_overview.png)
+
 ## Supported Devices
 
 > **Note:** This integration has only been tested with the **ISDT C4 Air**. Other ISDT devices with BLE support may work but are untested.
