@@ -1,13 +1,26 @@
 {
   "config": {
+    "flow_title": "ISDT {name}",
     "step": {
       "user": {
         "title": "Set up ISDT Charger",
         "description": "Confirm the detected ISDT charger to add it to Home Assistant."
+      },
+      "bluetooth_confirm": {
+        "title": "Confirm detected device",
+        "description": "Do you want to add **{name}** to Home Assistant?\n\nClick Submit to connect and read device info."
+      },
+      "show_device_info": {
+        "title": "Device Info",
+        "description": "Successfully connected to **{name}**.\n\n**Hardware Version:** {hw_version}\n**Firmware Version:** {fw_version}\n**Serial Number:** {serial_number}\n\n**GATT Characteristics:**\n{characteristics}\n\nClick Submit to finish setup."
       }
     },
+    "error": {
+      "cannot_connect": "Failed to connect to the charger. Ensure it is powered on and in range."
+    },
     "abort": {
-      "already_configured": "Device is already configured."
+      "already_configured": "Device is already configured.",
+      "no_devices_found": "No ISDT charger found. Ensure it is powered on and in range."
     }
   },
   "options": {

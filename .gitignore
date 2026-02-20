@@ -19,6 +19,9 @@ env/
 *.log
 .HA_VERSION
 
+# Other projects
+philips_shaver/
+
 # OS
 .DS_Store
 Thumbs.db
