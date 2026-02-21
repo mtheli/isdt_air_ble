@@ -103,6 +103,10 @@ After setup, you can adjust the **poll interval** via the integration options:
 3. Click **Configure**
 4. Set the poll interval (default: 10 seconds, range: 10–300)
 
+## Lovelace Card
+
+A matching dashboard card is available: **[ISDT Charger Card](https://github.com/mtheli/isdt_air_card)** — battery-style slots with live charge timer, wave animation, and full HA theme support.
+
 ## BLE Protocol
 
 The integration communicates via two GATT characteristics on BLE service `0000af00-...`:
