@@ -1,6 +1,6 @@
 {
   "domain": "isdt_air_ble",
-  "name": "ISDT C4 Air Charger",
+  "name": "ISDT Air Charger",
   "version": "0.2.0",
   "documentation": "https://github.com/mtheli/isdt_air_ble",
   "issue_tracker": "https://github.com/mtheli/isdt_air_ble/issues",

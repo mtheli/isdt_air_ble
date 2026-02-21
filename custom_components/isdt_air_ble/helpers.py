@@ -1,4 +1,4 @@
-"""Shared helpers for ISDT C4 Air integration."""
+"""Shared helpers for ISDT Air integration."""
 
 from homeassistant.helpers.device_registry import (
     DeviceInfo,
