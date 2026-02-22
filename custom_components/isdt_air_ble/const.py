@@ -2,36 +2,42 @@ DOMAIN = "isdt_air_ble"
 
 # Options
 CONF_SCAN_INTERVAL = "scan_interval"
-DEFAULT_SCAN_INTERVAL = 10  # seconds
+DEFAULT_SCAN_INTERVAL = 5  # seconds
 
 # BLE GATT characteristic UUIDs
 CHAR_UUID_AF01 = "0000af01-0000-1000-8000-00805f9b34fb"  # Notify/Write (normal polling)
 CHAR_UUID_AF02 = "0000af02-0000-1000-8000-00805f9b34fb"  # Write (hardware info)
 
 # BLE request commands (written to CHAR_UUID_AF02)
-#   HardwareInfoReq: fragt HW-Version, FW-Version und Serien-Nr. ab (einmalig nach Connect)
-#   Response CMD: 0xE1 auf AF02
+#   BindReq: registers the client with the charger (once after connect, before data polling)
+#   Response CMD: 0x19 on AF02 (bound_status: 0=ok)
+CMD_BIND_REQ = 0x18
+RESP_BIND = 0x19
+
+#   HardwareInfoReq: queries HW version, FW version, and serial number (once after connect)
+#   Response CMD: 0xE1 on AF02
 CMD_HARDWARE_INFO_REQ = bytearray([0xE0])
 
 # BLE request commands (written to CHAR_UUID_AF01, response via notifications)
-#   AlarmToneReq: fragt den aktuellen Alarmton-Status ab (an/aus)
+#   AlarmToneReq: queries the current alarm tone status (on/off)
 #   Response CMD: 0x93
 CMD_ALARM_TONE_REQ = bytearray([0x12, 0x92])
+CMD_ALARM_TONE_SET = bytearray([0x13, 0x9C])
 
-#   ElectricReq: fragt Spannungen und Ströme für einen Kanal ab (+ Zellspannungen)
-#   Byte 2: Kanal (0–5), Response CMD: 0xE5
+#   ElectricReq: queries voltages and currents for a channel (+ cell voltages)
+#   Byte 2: channel (0–5), Response CMD: 0xE5
 CMD_ELECTRIC_REQ = bytearray([0x12, 0xE4])
 
-#   WorkStateReq: fragt Ladezustand, Kapazität, Akkutyp etc. für einen Kanal ab
-#   Byte 2: Kanal (0–5), Response CMD: 0xE7
+#   WorkStateReq: queries charge state, capacity, battery type etc. for a channel
+#   Byte 2: channel (0–5), Response CMD: 0xE7
 CMD_WORKSTATE_REQ = bytearray([0x13, 0xE6])
 
-#   IRReq: fragt Innenwiderstand der Zellen für einen Kanal ab
-#   Byte 2: Kanal (0–5), Response CMD: 0xFB
+#   IRReq: queries internal resistance of cells for a channel
+#   Byte 2: channel (0–5), Response CMD: 0xFB
 CMD_IR_REQ = bytearray([0x13, 0xFA])
 
 # BLE response command bytes (received via AF01/AF02 notifications)
-RESP_HARDWARE_INFO = 0xE1   # HardwareInfoResp auf AF02
+RESP_HARDWARE_INFO = 0xE1   # HardwareInfoResp on AF02
 RESP_ALARM_TONE    = 0x93   # AlarmToneResp
 RESP_ELECTRIC      = 0xE5   # ElectricResp
 RESP_WORKSTATE     = 0xE7   # ChargerWorkStateResp

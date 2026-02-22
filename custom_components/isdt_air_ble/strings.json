@@ -31,7 +31,7 @@
           "scan_interval": "Poll interval (seconds)"
         },
         "data_description": {
-          "scan_interval": "How often the charger is queried via Bluetooth (10–300 seconds)."
+          "scan_interval": "How often the charger is queried via Bluetooth (3–300 seconds)."
         }
       }
     }
@@ -49,9 +49,6 @@
       },
       "rssi": {
         "name": "Signal Strength"
-      },
-      "last_seen": {
-        "name": "Last Seen"
       },
       "output_voltage": {
         "name": "Output Voltage"
@@ -105,6 +102,9 @@
       "cell_16": { "name": "Cell 16 Voltage" }
     },
     "binary_sensor": {
+      "connected": {
+        "name": "Connected"
+      },
       "slot_charging": {
         "name": "Charging"
       },

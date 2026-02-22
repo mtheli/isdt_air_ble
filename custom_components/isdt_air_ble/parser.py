@@ -13,6 +13,7 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+TRACE = 5  # HA supports trace level below DEBUG (10)
 
 
 def parse_responses(responses: list[bytes]) -> tuple[dict, bool | None]:
@@ -27,7 +28,7 @@ def parse_responses(responses: list[bytes]) -> tuple[dict, bool | None]:
     alarm_tone_on = None
 
     for raw in responses:
-        _LOGGER.debug("RAW DATA from C4 Air: %s", raw.hex(" "))
+        _LOGGER.log(TRACE, "RAW DATA from C4 Air: %s", raw.hex(" "))
 
         if len(raw) < 3:
             continue
@@ -56,7 +57,7 @@ def parse_responses(responses: list[bytes]) -> tuple[dict, bool | None]:
                 "Unknown CMD 0x%02x for channel %d: %s", cmd, ch, raw.hex(" ")
             )
 
-    _LOGGER.debug("Parsed data: %s", parsed)
+    _LOGGER.log(TRACE, "Parsed data: %s", parsed)
     return parsed, alarm_tone_on
 
 

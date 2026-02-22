@@ -9,7 +9,7 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .helpers import slot_device_info
+from .helpers import main_device_info, slot_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,7 +18,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
     """Set up ISDT C4 Air binary sensors from a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
-    entities = []
+    entities = [
+        ISDTC4ConnectedSensor(coordinator),
+    ]
     for ch in range(6):
         slot = ch + 1
         entities.append(ISDTC4SlotActiveSensor(coordinator, slot, ch))
@@ -151,3 +153,24 @@ class ISDTC4SlotErrorSensor(CoordinatorEntity, BinarySensorEntity):
         state = ch.get("work_state_str")
         error_code = ch.get("error_code", 0) or 0
         return state == "error" or error_code != 0
+
+
+class ISDTC4ConnectedSensor(CoordinatorEntity, BinarySensorEntity):
+    """Binary sensor indicating whether the BLE connection is active."""
+
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_has_entity_name = True
+    _attr_translation_key = "connected"
+
+    def __init__(self, coordinator):
+        super().__init__(coordinator)
+        address = coordinator.address
+        model = coordinator.model
+
+        self._attr_unique_id = f"{address}_connected"
+        self._attr_device_info = main_device_info(address, model)
+
+    @property
+    def is_on(self):
+        """Return True if the BLE connection is active."""
+        return self.coordinator._connected

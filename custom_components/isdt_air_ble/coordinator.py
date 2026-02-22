@@ -1,45 +1,78 @@
-"""Data update coordinator for ISDT C4 Air BLE charger."""
+"""Data update coordinator for ISDT Air BLE charger.
+
+Uses a persistent BLE connection with continuous command cycling (matching
+the manufacturer app pattern).  Commands are sent one at a time every 100ms
+in an infinite loop.  Data is pushed to Home Assistant at the configured
+scan interval.
+"""
 
 import asyncio
 import logging
-from datetime import timedelta
+import uuid
+from collections.abc import Callable
 
 from bleak import BleakClient
 from bleak_retry_connector import establish_connection
 
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.components import bluetooth
+from homeassistant.components.bluetooth import BluetoothCallbackMatcher
 from homeassistant.core import callback
-from homeassistant.util import dt as dt_util
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
     CHAR_UUID_AF01,
     CHAR_UUID_AF02,
-    CMD_HARDWARE_INFO_REQ,
     CMD_ALARM_TONE_REQ,
+    CMD_ALARM_TONE_SET,
+    CMD_BIND_REQ,
     CMD_ELECTRIC_REQ,
-    CMD_WORKSTATE_REQ,
+    CMD_HARDWARE_INFO_REQ,
     CMD_IR_REQ,
+    CMD_WORKSTATE_REQ,
     DEFAULT_SCAN_INTERVAL,
+    RESP_BIND,
 )
-from .parser import parse_responses, parse_hardware_info
+from .parser import parse_hardware_info, parse_responses
 
 _LOGGER = logging.getLogger(__name__)
+TRACE = 5  # HA supports trace level below DEBUG (10)
+
+# Backoff limits for reconnection attempts
+_BACKOFF_MIN = 5
+_BACKOFF_MAX = 300
+
+# Command interval matching manufacturer app (100ms)
+_CMD_INTERVAL = 0.1
+
+
+def _build_command_list() -> list[bytearray]:
+    """Build the circular command list (like manufacturer app).
+
+    Order: AlarmTone, then per channel: WorkState, Electric, IR
+    Total: 1 + 6*3 = 19 commands.
+    """
+    commands = [CMD_ALARM_TONE_REQ]
+    for ch in range(6):
+        commands.append(CMD_WORKSTATE_REQ + bytearray([ch]))
+        commands.append(CMD_ELECTRIC_REQ + bytearray([ch]))
+        commands.append(CMD_IR_REQ + bytearray([ch]))
+    return commands
 
 
 class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
-    """Coordinator for polling data from the ISDT C4 Air via persistent BLE connection."""
+    """Coordinator that keeps a persistent BLE connection to an ISDT charger."""
 
     def __init__(self, hass, address, model="C4 Air", scan_interval=DEFAULT_SCAN_INTERVAL):
         super().__init__(
             hass,
             _LOGGER,
             name=f"ISDT {model}",
-            update_interval=timedelta(seconds=scan_interval),
+            update_interval=None,  # no HA-driven polling; live loop handles everything
         )
         self.address = address
         self.model = model
-        self.data = {}  # Structure: {channel: {key: value, ...}, "_device": {...}}
+        self.scan_interval_seconds = scan_interval
+        self.data = {}
 
         # Hardware info (populated once after first connect)
         self.hw_version: str | None = None
@@ -54,63 +87,218 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         # Persistent BLE connection
         self._client: BleakClient | None = None
         self._connected = False
-        self._response_queue = asyncio.Queue(maxsize=100)
+        self._response_queue: asyncio.Queue = asyncio.Queue(maxsize=200)
         self._notification_started = False
 
-    async def async_start(self):
-        """Called on coordinator start - establish connection."""
-        _LOGGER.info("Starting ISDT C4 Air coordinator with persistent connection")
-        await self._ensure_connected()
+        # Live monitoring
+        self._connection_lock = asyncio.Lock()
+        self._live_task: asyncio.Task | None = None
+
+        # Circular command list
+        self._commands = _build_command_list()
+
+        # Bind UUID (random per instance, like manufacturer app)
+        self._bind_uuid = uuid.uuid4().bytes
+
+        # Bluetooth advertisement callback for instant reconnection
+        self._device_available = asyncio.Event()
+        self._unsub_bluetooth: Callable | None = None
+
+        # Change detection: only push to HA when sensor data actually changed
+        self._last_pushed_data: dict | None = None
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    @callback
+    def _async_on_bluetooth_event(
+        self,
+        service_info: bluetooth.BluetoothServiceInfoBleak,
+        change: bluetooth.BluetoothChange,
+    ) -> None:
+        """Wake the monitoring loop when the device advertises."""
+        _LOGGER.debug("Bluetooth event for %s: %s", self.address, change)
+        self._device_available.set()
+
+    def start_live_monitoring(self):
+        """Start the persistent connection loop as a background task."""
+        if self._live_task is None or self._live_task.done():
+            self._live_task = self.hass.loop.create_task(
+                self._live_monitoring_loop()
+            )
+        # Register BLE advertisement callback for instant wake-up on reconnect
+        if self._unsub_bluetooth is None:
+            self._unsub_bluetooth = bluetooth.async_register_callback(
+                self.hass,
+                self._async_on_bluetooth_event,
+                BluetoothCallbackMatcher(address=self.address, connectable=True),
+                bluetooth.BluetoothScanningMode.ACTIVE,
+            )
 
     async def async_shutdown(self):
-        """Called on shutdown - disconnect."""
-        _LOGGER.info("Shutting down ISDT C4 Air coordinator")
+        """Called on unload – cancel live task and disconnect."""
+        _LOGGER.info("Shutting down ISDT %s coordinator", self.model)
+        if self._unsub_bluetooth:
+            self._unsub_bluetooth()
+            self._unsub_bluetooth = None
+        if self._live_task:
+            self._live_task.cancel()
+            try:
+                await asyncio.wait_for(asyncio.shield(self._live_task), timeout=5.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
         await self._disconnect()
 
-    async def async_set_alarm_tone(self, enable: bool) -> None:
-        """Send alarm tone command to the charger.
+    # ------------------------------------------------------------------
+    # Live monitoring loop – continuous command cycling
+    # ------------------------------------------------------------------
 
-        AlarmToneTaskReq: [0x13, 0x9C, task_type]
-        task_type: 0x01 = on, 0x00 = off.
+    async def _live_monitoring_loop(self):
+        """Continuous command loop matching the manufacturer app pattern.
+
+        Sends one command every 100ms in a circular fashion.  After each
+        full cycle (19 commands ≈ 1.9s), responses are collected, parsed,
+        and pushed to HA if enough time has passed since the last push.
         """
-        await self._ensure_connected()
-        task_type = 0x01 if enable else 0x00
-        cmd = bytearray([0x13, 0x9C, task_type])
-        await self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False)
-        self._alarm_tone_on = enable
-        _LOGGER.info("Alarm tone %s", "enabled" if enable else "disabled")
+        backoff = _BACKOFF_MIN
+        cmd_index = 0
+        last_push_time = 0.0
+
+        while True:
+            try:
+                # --- Ensure connection ---
+                if not (self._client and self._client.is_connected and self._notification_started):
+                    service_info = bluetooth.async_last_service_info(
+                        self.hass, self.address, connectable=True
+                    )
+
+                    # Waiting for the device to be in range (advertising)
+                    if not service_info:
+                        _LOGGER.info(
+                            "Device %s not in range – waiting for advertisement (max %ds)",
+                            self.address,
+                            backoff,
+                        )
+                        self._device_available.clear()
+                        try:
+                            await asyncio.wait_for(
+                                self._device_available.wait(), timeout=backoff
+                            )
+                            _LOGGER.info("Device advertisement received, reconnecting now")
+                        except asyncio.TimeoutError:
+                            pass
+                        backoff = min(backoff * 2, _BACKOFF_MAX)
+                        continue
+
+                    # Connecting to device
+                    backoff = _BACKOFF_MIN
+                    async with self._connection_lock:
+                        await self._connect(service_info.device)
+                    cmd_index = 0
+                    last_push_time = 0.0
+
+                    # Drain any stale responses after reconnect
+                    while not self._response_queue.empty():
+                        try:
+                            self._response_queue.get_nowait()
+                        except asyncio.QueueEmpty:
+                            break
+
+                # Send next command in the cycle
+                cmd = self._commands[cmd_index]
+                await self._client.write_gatt_char(
+                    CHAR_UUID_AF01, cmd, response=False
+                )
+                await asyncio.sleep(_CMD_INTERVAL)
+
+                # Increment command index for next cycle
+                cmd_index = (cmd_index + 1) % len(self._commands)
+
+                # After cycle completion, collect responses and push data
+                if cmd_index == 0:
+                    await self._collect_and_push(last_push_time)
+                    last_push_time = asyncio.get_event_loop().time()
+
+            except asyncio.CancelledError:
+                _LOGGER.debug("Live monitoring cancelled")
+                raise
+            except Exception as err:
+                _LOGGER.warning("Live monitoring error: %s – reconnecting", err)
+                await self._disconnect()
+                self._device_available.clear()
+                try:
+                    await asyncio.wait_for(
+                        self._device_available.wait(), timeout=backoff
+                    )
+                    _LOGGER.debug("Device advertisement received, reconnecting now")
+                except asyncio.TimeoutError:
+                    pass
+                backoff = min(backoff * 2, _BACKOFF_MAX)
+
+    async def _collect_and_push(self, last_push_time: float):
+        """Collect queued responses, parse, and push to HA."""
+        responses = []
+        try:
+            while not self._response_queue.empty():
+                responses.append(self._response_queue.get_nowait())
+        except asyncio.QueueEmpty:
+            pass
+
+        if not responses:
+            return
+
+        # Parsing response
+        _LOGGER.debug("Received %d responses", len(responses))
+        parsed, alarm_tone_on = parse_responses(responses)
+        self._alarm_tone_on = alarm_tone_on
+
+        # Fetch hardware info if not yet done
+        if not self._hw_info_fetched:
+            await self._fetch_hardware_info()
+
+        # Update device registry once when hw info is available
+        if self._hw_info_fetched and not self._device_registry_updated:
+            self._update_device_registry()
+
+        # Only push to HA when sensor data actually changed (skip rssi/last_seen)
+        if self._last_pushed_data is not None and not self._sensor_data_changed(parsed):
+            _LOGGER.debug("Data unchanged, skipping push")
+            return
+
+        # Add device-level metadata (not part of change detection)
+        parsed["_device"] = {
+            "rssi": self._get_rssi(),
+        }
+
+        self._last_pushed_data = parsed
+        self.async_set_updated_data(parsed)
+
+    def _sensor_data_changed(self, parsed: dict) -> bool:
+        """Compare channel sensor data against last push, ignoring _device metadata."""
+        if self._last_pushed_data is None:
+            return True
+        for key in parsed:
+            if key == "_device":
+                continue
+            if parsed[key] != self._last_pushed_data.get(key):
+                return True
+        return False
 
     # ------------------------------------------------------------------
     # Connection management
     # ------------------------------------------------------------------
 
-    async def _ensure_connected(self):
-        """Ensure BLE connection is established."""
+    async def _connect(self, ble_device):
+        """Establish BLE connection and set up notifications."""
+        if self._client:
+            await self._disconnect()
 
-        # checking if already connected
-        if self._client and self._client.is_connected:
-            if self._notification_started:
-                _LOGGER.debug("Already connected and notifications active")
-                return
-            else:
-                _LOGGER.warning(
-                    "Client says connected but notifications not active - reconnecting"
-                )
-                await self._disconnect()
-
-        _LOGGER.debug("Establishing persistent connection to %s", self.address)
-
-        # getting device by address
-        ble_device = bluetooth.async_ble_device_from_address(
-            self.hass, self.address, connectable=True
-        )
-        if not ble_device:
-            raise UpdateFailed(f"Device {self.address} not found")
+        _LOGGER.debug("Connecting to %s", self.address)
 
         try:
-            # Connecting to device
             self._client = await establish_connection(
-                BleakClient, ble_device, "ISDT C4 Air", timeout=15
+                BleakClient, ble_device, f"ISDT {self.model}", timeout=15
             )
             _LOGGER.debug(
                 "Connected, services available: %d",
@@ -118,24 +306,23 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             )
             await asyncio.sleep(1.0)
 
-            # setup notifications
             await self._setup_notifications()
-
+            await self._send_bind_request()
             self._connected = True
-            _LOGGER.info("Persistent connection established to %s", self.address)
+            _LOGGER.debug("Persistent connection established to %s", self.address)
 
-            # Fetch hardware info once after connection
+            # Fetch hardware info once
             if not self._hw_info_fetched:
                 await self._fetch_hardware_info()
 
         except Exception as err:
-            _LOGGER.error("Failed to establish connection: %s", err)
+            _LOGGER.warning("Failed to connect: %s", err)
             self._connected = False
             self._client = None
             raise
 
     async def _setup_notifications(self):
-        """Set up BLE notifications for responses."""
+        """Set up BLE notifications for responses on AF01."""
         if self._notification_started:
             return
 
@@ -143,18 +330,19 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             raise UpdateFailed("Client not connected, cannot setup notifications")
 
         def disconnected_callback(client):
-            _LOGGER.warning(
-                "BLE device disconnected unexpectedly: %s (was connected: %s)",
+            _LOGGER.debug(
+                "BLE device disconnected: %s",
                 self.address,
-                self._connected,
             )
             self._connected = False
             self._notification_started = False
+            # Notify entities so connected sensor updates immediately
+            self.async_set_updated_data(self.data or {})
 
         self._client.set_disconnected_callback(disconnected_callback)
 
         def notification_callback(sender, data):
-            _LOGGER.debug("Notification received: %s", data.hex(" "))
+            _LOGGER.log(TRACE, "Notification received: %s", data.hex(" "))
             try:
                 self._response_queue.put_nowait(data)
             except asyncio.QueueFull:
@@ -166,32 +354,98 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         await asyncio.sleep(0.5)
         _LOGGER.debug("Notifications started on %s", CHAR_UUID_AF01)
 
+    async def _send_bind_request(self):
+        """Send bind request on AF02 (matching manufacturer app protocol).
+
+        Packet: [0x18, uuid[0..15], 0x00, status=0x00]  (19 bytes)
+        Response: [0x19, bound_status]  (bound_status 0=ok)
+        """
+        bind_response: asyncio.Queue = asyncio.Queue(maxsize=5)
+
+        def af02_callback(sender, data):
+            _LOGGER.debug("AF02 bind response (%d bytes): %s", len(data), data.hex(" "))
+            try:
+                bind_response.put_nowait(data)
+            except asyncio.QueueFull:
+                pass
+
+        try:
+            await self._client.start_notify(CHAR_UUID_AF02, af02_callback)
+            await asyncio.sleep(0.3)
+
+            cmd = bytearray([CMD_BIND_REQ]) + bytearray(self._bind_uuid) + bytearray([0x00, 0x00])
+            _LOGGER.debug("Sending BindReq on AF02: %s", cmd.hex(" "))
+            await self._client.write_gatt_char(CHAR_UUID_AF02, cmd, response=False)
+
+            try:
+                data = await asyncio.wait_for(bind_response.get(), timeout=3.0)
+                if len(data) >= 2 and data[0] == RESP_BIND:
+                    bound_status = data[1]
+                    if bound_status == 0:
+                        _LOGGER.info("Bind successful")
+                    else:
+                        _LOGGER.warning("Bind response status: %d", bound_status)
+                else:
+                    _LOGGER.debug("Unexpected AF02 response: %s", data.hex(" "))
+            except asyncio.TimeoutError:
+                _LOGGER.warning("Timeout waiting for BindResp on AF02")
+
+        except Exception as err:
+            _LOGGER.warning("Failed to send bind request: %s", err)
+
+        finally:
+            try:
+                await self._client.stop_notify(CHAR_UUID_AF02)
+            except Exception:
+                pass
+
     async def _disconnect(self):
-        """Disconnect from BLE device."""
+        """Disconnect from BLE device (with timeout to avoid hanging)."""
         if self._client and self._client.is_connected:
             try:
-                if self._notification_started:
-                    await self._client.stop_notify(CHAR_UUID_AF01)
-                    self._notification_started = False
-                await self._client.disconnect()
-                _LOGGER.info("Disconnected from %s", self.address)
-            except Exception as err:
-                _LOGGER.error("Error disconnecting: %s", err)
+                async with asyncio.timeout(5.0):
+                    if self._notification_started:
+                        await self._client.stop_notify(CHAR_UUID_AF01)
+                        self._notification_started = False
+                    await self._client.disconnect()
+                    _LOGGER.debug("Disconnected from %s", self.address)
+            except (TimeoutError, Exception) as err:
+                _LOGGER.debug("Error during disconnect: %s", err)
 
         self._client = None
         self._connected = False
+
+    # ------------------------------------------------------------------
+    # DataUpdateCoordinator override – passive when live connection active
+    # ------------------------------------------------------------------
+
+    async def _async_update_data(self):
+        """Called by HA's update interval – skip when live loop is active."""
+        return self.data or {}
+
+    # ------------------------------------------------------------------
+    # Alarm tone control
+    # ------------------------------------------------------------------
+
+    async def async_set_alarm_tone(self, enable: bool) -> None:
+        """Send alarm tone command to the charger."""
+        async with self._connection_lock:
+            if not self._client or not self._client.is_connected:
+                _LOGGER.warning("Cannot set alarm tone – not connected")
+                return
+            task_type = 0x01 if enable else 0x00
+            cmd = CMD_ALARM_TONE_SET + bytearray([task_type])
+            await self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False)
+            self._alarm_tone_on = enable
+            _LOGGER.info("Alarm tone %s", "enabled" if enable else "disabled")
 
     # ------------------------------------------------------------------
     # Hardware info (one-time query after connect)
     # ------------------------------------------------------------------
 
     async def _fetch_hardware_info(self):
-        """Fetch hardware/firmware info from the device (once).
-
-        The manufacturer app sends HardwareInfoReq via characteristic AF02
-        (not AF01 which is used for normal polling commands).
-        """
-        hw_response = asyncio.Queue(maxsize=5)
+        """Fetch hardware/firmware info from the device (once)."""
+        hw_response: asyncio.Queue = asyncio.Queue(maxsize=5)
 
         def hw_notification_callback(sender, data):
             _LOGGER.debug("AF02 notification (%d bytes): %s", len(data), data.hex(" "))
@@ -201,7 +455,6 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 pass
 
         try:
-            # Start notifications on AF02
             await self._client.start_notify(
                 CHAR_UUID_AF02, hw_notification_callback
             )
@@ -212,7 +465,6 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 CHAR_UUID_AF02, CMD_HARDWARE_INFO_REQ, response=False
             )
 
-            # Wait for response
             try:
                 data = await asyncio.wait_for(hw_response.get(), timeout=3.0)
                 _LOGGER.debug(
@@ -238,14 +490,13 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.warning("Failed to fetch hardware info: %s", err)
 
         finally:
-            # Stop AF02 notifications - we only need them once
             try:
                 await self._client.stop_notify(CHAR_UUID_AF02)
             except Exception:
                 pass
 
     # ------------------------------------------------------------------
-    # RSSI / last seen
+    # RSSI / device registry
     # ------------------------------------------------------------------
 
     def _get_rssi(self) -> int | None:
@@ -286,102 +537,3 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 self.hw_version,
                 self.serial_number,
             )
-
-    # ------------------------------------------------------------------
-    # Data update
-    # ------------------------------------------------------------------
-
-    async def _async_update_data(self):
-        """Poll data from the charger via persistent BLE connection."""
-        try:
-            await self._ensure_connected()
-
-            if not self._client or not self._client.is_connected:
-                raise UpdateFailed("Client not connected after ensure_connected")
-
-            # Drain stale responses
-            while not self._response_queue.empty():
-                try:
-                    self._response_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    break
-
-            await self._client.write_gatt_char(
-                CHAR_UUID_AF01, CMD_ALARM_TONE_REQ, response=False
-            )
-            await asyncio.sleep(0.09)
-
-            # Query all 6 channels (90ms between commands like manufacturer app)
-            # Per channel: ElectricReq, WorkStateReq, IRReq (3 commands)
-            for channel in range(6):
-                if not self._client.is_connected:
-                    raise UpdateFailed(f"Connection lost at channel {channel}")
-
-                try:
-                    await self._client.write_gatt_char(
-                        CHAR_UUID_AF01, CMD_ELECTRIC_REQ + bytearray([channel]), response=False
-                    )
-                    await asyncio.sleep(0.09)
-
-                    await self._client.write_gatt_char(
-                        CHAR_UUID_AF01, CMD_WORKSTATE_REQ + bytearray([channel]), response=False
-                    )
-                    await asyncio.sleep(0.09)
-
-                    await self._client.write_gatt_char(
-                        CHAR_UUID_AF01, CMD_IR_REQ + bytearray([channel]), response=False
-                    )
-                    await asyncio.sleep(0.09)
-
-                except Exception as write_err:
-                    _LOGGER.error(
-                        "Write failed on channel %d: %s (is_connected=%s)",
-                        channel,
-                        write_err,
-                        self._client.is_connected if self._client else None,
-                    )
-                    raise UpdateFailed(f"Write failed: {write_err}")
-
-            # Collect responses (expect 19: 1 alarm tone + 6 channels × 3 commands)
-            expected_responses = 19
-            responses = []
-            try:
-                while len(responses) < expected_responses:
-                    data = await asyncio.wait_for(
-                        self._response_queue.get(), timeout=2.0
-                    )
-                    responses.append(data)
-            except asyncio.TimeoutError:
-                _LOGGER.debug(
-                    "Response timeout - got %d/%d responses",
-                    len(responses),
-                    expected_responses,
-                )
-
-            _LOGGER.debug("Received %d responses", len(responses))
-
-            parsed, alarm_tone_on = parse_responses(responses)
-            self._alarm_tone_on = alarm_tone_on
-
-            # Add device-level data (RSSI, last_seen)
-            parsed["_device"] = {
-                "rssi": self._get_rssi(),
-                "last_seen": dt_util.utcnow(),
-            }
-
-            # Fetch hardware info if not yet done (e.g. first connect failed)
-            if not self._hw_info_fetched:
-                await self._fetch_hardware_info()
-
-            # Update device registry once when hw info is available
-            if self._hw_info_fetched and not self._device_registry_updated:
-                self._update_device_registry()
-
-            return parsed
-
-        except Exception as err:
-            _LOGGER.error("Error during update: %s", err)
-            self._connected = False
-            await self._disconnect()
-            raise UpdateFailed(f"Communication error: {err}")
-

@@ -1,4 +1,4 @@
-"""The ISDT C4 Air integration."""
+"""The ISDT Air BLE integration."""
 
 import logging
 
@@ -15,7 +15,7 @@ PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SWITCH]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up ISDT C4 Air from a config entry."""
+    """Set up ISDT Air BLE from a config entry."""
     address = entry.data["address"]
     model = entry.data.get("model", "C4 Air")
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
@@ -27,19 +27,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Start connection in the background (non-blocking, tied to entry lifecycle)
-    async def _async_start_connection():
-        try:
-            await coordinator.async_start()
-            await coordinator.async_refresh()
-        except Exception as err:
-            _LOGGER.warning(
-                "Initial connection failed: %s - Will retry on next update", err
-            )
-
-    entry.async_create_background_task(
-        hass, _async_start_connection(), "isdt_air_ble_initial_connection"
-    )
+    # Start persistent connection loop in the background
+    coordinator.start_live_monitoring()
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 

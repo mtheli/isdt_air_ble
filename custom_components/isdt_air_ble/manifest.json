@@ -1,7 +1,7 @@
 {
   "domain": "isdt_air_ble",
   "name": "ISDT Air Charger",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "documentation": "https://github.com/mtheli/isdt_air_ble",
   "issue_tracker": "https://github.com/mtheli/isdt_air_ble/issues",
   "requirements": ["bleak>=0.21.0", "bleak-retry-connector>=3.5.0"],

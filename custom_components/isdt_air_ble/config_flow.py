@@ -65,7 +65,7 @@ class ISDTOptionsFlow(OptionsFlow):
         schema = vol.Schema(
             {
                 vol.Required(CONF_SCAN_INTERVAL, default=current_interval): vol.All(
-                    vol.Coerce(int), vol.Range(min=10, max=300)
+                    vol.Coerce(int), vol.Range(min=3, max=300)
                 ),
             }
         )

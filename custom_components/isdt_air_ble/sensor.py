@@ -2,6 +2,7 @@
 
 import logging
 
+from homeassistant.components import bluetooth
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -50,7 +51,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
             ),
             ISDTC4TotalChargingSensor(coordinator),
             ISDTC4RSSISensor(coordinator),
-            ISDTC4LastSeenSensor(coordinator),
         ]
     )
 
@@ -167,6 +167,14 @@ class ISDTC4AirSensorBase(CoordinatorEntity, SensorEntity):
             self._attr_device_info = main_device_info(address, model)
 
     @property
+    def available(self) -> bool:
+        """Return True if the device is currently in Bluetooth range."""
+        service_info = bluetooth.async_last_service_info(
+            self.hass, self.coordinator.address, connectable=True
+        )
+        return service_info is not None
+
+    @property
     def native_value(self):
         """Return the current sensor value."""
         if self.coordinator.data and self._channel in self.coordinator.data:
@@ -261,7 +269,7 @@ class ISDTC4EnergySensor(ISDTC4AirSensorBase):
 
     _attr_native_unit_of_measurement = UnitOfEnergy.WATT_HOUR
     _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_suggested_display_precision = 2
 
 
@@ -271,17 +279,36 @@ class ISDTC4TimeSensor(ISDTC4AirSensorBase):
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_icon = "mdi:timer-outline"
 
+    def __init__(self, coordinator, translation_key, data_key, channel, slot=None):
+        super().__init__(coordinator, translation_key, data_key, channel, slot=slot)
+        self._frozen_start = None
+
     @property
     def native_value(self):
-        """Return charging start time computed from work_period."""
+        """Return charging start time computed from work_period.
+
+        Frozen when status is 'done' so the displayed duration stops at the
+        final charge time instead of continuing to count up.
+        """
         if not self.coordinator.data or self._channel not in self.coordinator.data:
             return None
         from homeassistant.util import dt as dt_util
         from datetime import timedelta
         ch = self.coordinator.data[self._channel]
         work_period = ch.get("work_period", 0) or 0
-        if work_period <= 0:
+        work_state = ch.get("work_state_str")
+
+        if work_period <= 0 or work_state in ("empty", "idle"):
+            self._frozen_start = None
             return None
+
+        if work_state == "done":
+            if self._frozen_start is None:
+                self._frozen_start = dt_util.utcnow() - timedelta(seconds=work_period)
+            return self._frozen_start
+
+        # charging / error: live computation, clear any frozen state
+        self._frozen_start = None
         return dt_util.utcnow() - timedelta(seconds=work_period)
 
 
@@ -387,18 +414,3 @@ class ISDTC4RSSISensor(ISDTC4AirSensorBase):
         return None
 
 
-class ISDTC4LastSeenSensor(ISDTC4AirSensorBase):
-    """Last successful communication timestamp sensor."""
-
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
-    _attr_icon = "mdi:clock-check-outline"
-
-    def __init__(self, coordinator):
-        super().__init__(coordinator, "last_seen", "last_seen", channel=0)
-
-    @property
-    def native_value(self):
-        """Return last seen timestamp as datetime."""
-        if self.coordinator.data and "_device" in self.coordinator.data:
-            return self.coordinator.data["_device"].get("last_seen")
-        return None
