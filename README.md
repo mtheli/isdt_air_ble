@@ -7,6 +7,12 @@ Custom Home Assistant integration for **ISDT chargers** with Bluetooth Low Energ
 
 ![Device Overview](images/device_overview.png)
 
+## Lovelace Card
+
+A matching dashboard card is available: **[ISDT Charger Card](https://github.com/mtheli/isdt_air_card)** — battery-style slots with live charge timer, connection indicator, and full HA theme support.
+
+![ISDT Charger Card](images/lovelace_card.png)
+
 ## Supported Devices
 
 > **Note:** This integration has only been tested with the **ISDT C4 Air**. Other ISDT devices with BLE support may work but are untested.
@@ -36,18 +42,18 @@ The integration auto-detects the device model from BLE manufacturer data. Other 
 
 | Sensor | Type | Description |
 |--------|------|-------------|
+| Connected | Binary (Connectivity) | BLE connection active |
 | Input Voltage | Voltage (V) | Power supply voltage |
 | Input Current | Current (A) | Total input current |
 | Total Charging Current | Current (A) | Sum of all slot currents |
 | Slot 1–6 Status | Enum | `empty`, `idle`, `charging`, `done`, `error` |
 | Signal Strength | RSSI (dBm) | BLE signal strength (disabled by default) |
-| Last Seen | Timestamp | Last successful BLE communication |
 
 **Per slot (sub-device):**
 
 | Sensor | Type | Description |
 |--------|------|-------------|
-| Charging | Binary | Whether the slot is actively charging |
+| Charging | Binary (Charging) | Whether the slot is actively charging |
 | Battery Inserted | Binary (Plug) | Whether a battery is present in the slot |
 | Error | Binary (Problem) | Whether the slot has a charging error |
 | Output Voltage | Voltage (V) | Slot output voltage |
@@ -103,10 +109,6 @@ After setup, you can adjust the **poll interval** via the integration options:
 3. Click **Configure**
 4. Set the poll interval (default: 10 seconds, range: 10–300)
 
-## Lovelace Card
-
-A matching dashboard card is available: **[ISDT Charger Card](https://github.com/mtheli/isdt_air_card)** — battery-style slots with live charge timer, wave animation, and full HA theme support.
-
 ## BLE Protocol
 
 The integration communicates via two GATT characteristics on BLE service `0000af00-...`:
@@ -114,7 +116,7 @@ The integration communicates via two GATT characteristics on BLE service `0000af
 | Characteristic | UUID | Purpose |
 |----------------|------|---------|
 | AF01 | `0000af01-...` | Polling commands & notifications (electric, workstate, IR, alarm tone) |
-| AF02 | `0000af02-...` | Hardware info request (one-time after connect) |
+| AF02 | `0000af02-...` | Bind handshake & hardware info request (after connect, before polling) |
 
 ## License
 
