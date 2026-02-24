@@ -111,13 +111,15 @@ After setup, you can adjust the **poll interval** via the integration options:
 
 ## BLE Protocol
 
-The integration communicates via two GATT characteristics on BLE service `0000af00-...`:
+The integration communicates directly via BLE — no cloud, no account required. All communication is fully local.
 
-| Characteristic | UUID | Purpose |
-|----------------|------|---------|
-| AF01 | `0000af01-...` | Polling commands & notifications (electric, workstate, IR, alarm tone) |
-| AF02 | `0000af02-...` | Bind handshake & hardware info request (after connect, before polling) |
+The charger uses a single GATT service with two characteristics:
+
+- **AF01** – Data polling via continuous command cycling (workstate, electric, IR, alarm tone)
+- **AF02** – Bind handshake and hardware info query (once after connect, before polling)
+
+For a detailed technical description of the BLE protocol including packet formats, command reference, and timing, see [PROTOCOL.md](PROTOCOL.md).
 
 ## License
 
-MIT
+[MIT](LICENSE)
