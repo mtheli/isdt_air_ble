@@ -1,7 +1,8 @@
 # ISDT Air BLE – Home Assistant Integration
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
-[![HA Version](https://img.shields.io/badge/HA-2024.11%2B-blue.svg)](https://www.home-assistant.io)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![GitHub Release](https://img.shields.io/github/v/release/mtheli/isdt_air_ble)](https://github.com/mtheli/isdt_air_ble/releases)
+[![License: MIT](https://img.shields.io/github/license/mtheli/isdt_air_ble)](LICENSE)
 
 Custom Home Assistant integration for **ISDT chargers** with Bluetooth Low Energy (BLE) connectivity. Communicates directly with the charger via a persistent BLE connection — no cloud, no app required.
 
