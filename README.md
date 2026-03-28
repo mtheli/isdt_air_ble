@@ -121,6 +121,10 @@ The charger uses a single GATT service with two characteristics:
 
 For a detailed technical description of the BLE protocol including packet formats, command reference, and timing, see [PROTOCOL.md](PROTOCOL.md).
 
+## Disclaimer
+
+This is an independent community project and is not affiliated with, endorsed by, or sponsored by ISDT. All product names, trademarks, and registered trademarks are property of their respective owners.
+
 ## License
 
 [MIT](LICENSE)
