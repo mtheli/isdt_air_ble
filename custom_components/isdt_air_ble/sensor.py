@@ -513,7 +513,7 @@ class ISDTMASS2ProtocolSensor(ISDTMASS2SensorBase):
     """Per-port charging protocol sensor (None/PD/FastCharge)."""
 
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = ["none", "PD", "fast_charge"]
+    _attr_options = ["none", "pd", "fast_charge"]
     _attr_icon = "mdi:lightning-bolt"
 
     def __init__(self, coordinator, channel, port_num):
