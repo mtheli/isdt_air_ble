@@ -126,7 +126,7 @@
         "name": "Protocol",
         "state": {
           "none": "None",
-          "PD": "USB PD",
+          "pd": "USB PD",
           "fast_charge": "Fast Charge"
         }
       },

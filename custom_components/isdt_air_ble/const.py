@@ -167,6 +167,6 @@ MASS2_FRAME_HEADER = 0x31
 # MASS2 charging protocol mapping
 MASS2_PROTOCOL_MAP = {
     0: "none",
-    1: "PD",
+    1: "pd",
     2: "fast_charge",
 }
