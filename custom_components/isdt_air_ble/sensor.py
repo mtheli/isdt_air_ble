@@ -1,4 +1,4 @@
-"""Sensor platform for ISDT C4 Air integration."""
+"""Sensor platform for ISDT Air BLE integration."""
 
 import logging
 
@@ -12,13 +12,14 @@ from homeassistant.const import (
     UnitOfElectricPotential,
     UnitOfElectricCurrent,
     UnitOfEnergy,
+    UnitOfPower,
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
-from .helpers import main_device_info, slot_device_info
+from .const import DOMAIN, DeviceType, MASS2_PORT_COUNT, MASS2_PORT_LABELS
+from .helpers import main_device_info, slot_device_info, port_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,12 +30,21 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    """Set up ISDT C4 Air sensors from a config entry."""
+    """Set up ISDT sensor entities from a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
-    entities = []
+    entities = [ISDTC4RSSISensor(coordinator)]
 
-    # Global sensors → main device
+    if coordinator.device_type == DeviceType.ADAPTER:
+        _setup_adapter_sensors(coordinator, entities)
+    else:
+        _setup_charger_sensors(coordinator, entities)
+
+    async_add_entities(entities)
+
+
+def _setup_charger_sensors(coordinator, entities):
+    """Set up sensors for charger devices (C4 Air etc.)."""
     entities.extend(
         [
             ISDTC4VoltageSensor(
@@ -50,11 +60,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 channel=0,
             ),
             ISDTC4TotalChargingSensor(coordinator),
-            ISDTC4RSSISensor(coordinator),
         ]
     )
 
-    # Per-slot sensors → slot sub-devices
     for ch in range(6):
         slot = ch + 1
 
@@ -126,7 +134,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
             ]
         )
 
-        # Cell voltage sensors (max 16 cells per slot)
         for cell_idx in range(16):
             entities.append(
                 ISDTC4CellVoltageSensor(
@@ -138,7 +145,24 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 )
             )
 
-    async_add_entities(entities)
+
+def _setup_adapter_sensors(coordinator, entities):
+    """Set up sensors for adapter devices (MASS2)."""
+    for port in range(MASS2_PORT_COUNT):
+        port_num = port + 1
+        # Per-port detail sensors → port sub-device
+        entities.extend(
+            [
+                ISDTMASS2VoltageSensor(coordinator, port, port_num),
+                ISDTMASS2CurrentSensor(coordinator, port, port_num),
+                ISDTMASS2PowerSensor(coordinator, port, port_num),
+                ISDTMASS2ProtocolSensor(coordinator, port, port_num),
+            ]
+        )
+        # Port status overview → main device
+        entities.append(ISDTMASS2PortStatusSensor(coordinator, port, port_num))
+
+    entities.append(ISDTMASS2TotalPowerSensor(coordinator))
 
 
 # ---------------------------------------------------------------------------
@@ -412,5 +436,205 @@ class ISDTC4RSSISensor(ISDTC4AirSensorBase):
         if self.coordinator.data and "_device" in self.coordinator.data:
             return self.coordinator.data["_device"].get("rssi")
         return None
+
+
+# ---------------------------------------------------------------------------
+# MASS2 adapter sensor classes
+# ---------------------------------------------------------------------------
+
+
+class ISDTMASS2SensorBase(CoordinatorEntity, SensorEntity):
+    """Base class for MASS2 port sensors."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator, translation_key, data_key, channel, port_num):
+        super().__init__(coordinator)
+        self._data_key = data_key
+        self._channel = channel
+        address = coordinator.address
+        model = coordinator.model
+
+        self._attr_unique_id = f"{address}_port{port_num}_{data_key}"
+        self._attr_translation_key = translation_key
+        self._attr_device_info = port_device_info(address, port_num, model)
+
+    @property
+    def available(self) -> bool:
+        service_info = bluetooth.async_last_service_info(
+            self.hass, self.coordinator.address, connectable=True
+        )
+        return service_info is not None
+
+    @property
+    def native_value(self):
+        if self.coordinator.data and self._channel in self.coordinator.data:
+            return self.coordinator.data[self._channel].get(self._data_key)
+        return None
+
+
+class ISDTMASS2VoltageSensor(ISDTMASS2SensorBase):
+    """Per-port voltage sensor."""
+
+    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
+    _attr_device_class = SensorDeviceClass.VOLTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, coordinator, channel, port_num):
+        super().__init__(coordinator, "port_voltage", "voltage", channel, port_num)
+
+
+class ISDTMASS2CurrentSensor(ISDTMASS2SensorBase):
+    """Per-port current sensor."""
+
+    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
+    _attr_device_class = SensorDeviceClass.CURRENT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 3
+
+    def __init__(self, coordinator, channel, port_num):
+        super().__init__(coordinator, "port_current", "current", channel, port_num)
+
+
+class ISDTMASS2PowerSensor(ISDTMASS2SensorBase):
+    """Per-port power sensor (computed V * A)."""
+
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, coordinator, channel, port_num):
+        super().__init__(coordinator, "port_power", "power", channel, port_num)
+
+
+class ISDTMASS2ProtocolSensor(ISDTMASS2SensorBase):
+    """Per-port charging protocol sensor (None/PD/FastCharge)."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["none", "PD", "fast_charge"]
+    _attr_icon = "mdi:lightning-bolt"
+
+    def __init__(self, coordinator, channel, port_num):
+        super().__init__(coordinator, "port_protocol", "protocol_str", channel, port_num)
+
+
+class ISDTMASS2PortStatusSensor(CoordinatorEntity, SensorEntity):
+    """Per-port status sensor on the main device (overview).
+
+    States:
+        off    – no voltage on the port
+        idle   – voltage present but no sink drawing power
+        active – device-reported active state (status == 1)
+    """
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["off", "idle", "active"]
+    _attr_has_entity_name = True
+    _attr_translation_key = "port_status"
+
+    def __init__(self, coordinator, channel, port_num):
+        super().__init__(coordinator)
+        self._channel = channel
+        self._port_num = port_num
+        address = coordinator.address
+        model = coordinator.model
+
+        label = MASS2_PORT_LABELS[port_num - 1] if 1 <= port_num <= len(MASS2_PORT_LABELS) else f"Port {port_num}"
+        self._attr_unique_id = f"{address}_port{port_num}_status"
+        self._attr_translation_placeholders = {"port": label}
+        self._attr_device_info = main_device_info(address, model)
+
+    @property
+    def available(self) -> bool:
+        service_info = bluetooth.async_last_service_info(
+            self.hass, self.coordinator.address, connectable=True
+        )
+        return service_info is not None
+
+    @property
+    def native_value(self):
+        if not self.coordinator.data or self._channel not in self.coordinator.data:
+            return None
+        ch = self.coordinator.data[self._channel]
+
+        # Trust the device-reported status byte (matches manufacturer app).
+        # status == 1 means actively delivering power to a sink.
+        if ch.get("status") == 1:
+            return "active"
+
+        # status != 1: distinguish between "voltage present but no sink" (idle)
+        # and "no voltage at all" (off)
+        voltage = ch.get("voltage", 0) or 0
+        if voltage > 0:
+            return "idle"
+        return "off"
+
+    @property
+    def icon(self):
+        state = self.native_value
+        icons = {
+            "off": "mdi:power-plug-off-outline",
+            "idle": "mdi:power-plug-outline",
+            "active": "mdi:power-plug",
+        }
+        return icons.get(state, "mdi:power-plug-outline")
+
+    @property
+    def extra_state_attributes(self):
+        if not self.coordinator.data or self._channel not in self.coordinator.data:
+            return None
+        ch = self.coordinator.data[self._channel]
+        attrs = {}
+        protocol = ch.get("protocol_str")
+        if protocol and protocol != "none":
+            attrs["protocol"] = protocol
+        voltage = ch.get("voltage")
+        if voltage and voltage > 0:
+            attrs["voltage"] = f"{voltage:.2f} V"
+        current = ch.get("current")
+        if current and current > 0:
+            attrs["current"] = f"{current:.3f} A"
+        power = ch.get("power")
+        if power and power > 0:
+            attrs["power"] = f"{power:.1f} W"
+        return attrs if attrs else None
+
+
+class ISDTMASS2TotalPowerSensor(CoordinatorEntity, SensorEntity):
+    """Total power across all USB ports."""
+
+    _attr_has_entity_name = True
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, coordinator):
+        super().__init__(coordinator)
+        address = coordinator.address
+        model = coordinator.model
+        self._attr_unique_id = f"{address}_total_power"
+        self._attr_translation_key = "total_power"
+        self._attr_device_info = main_device_info(address, model)
+
+    @property
+    def available(self) -> bool:
+        service_info = bluetooth.async_last_service_info(
+            self.hass, self.coordinator.address, connectable=True
+        )
+        return service_info is not None
+
+    @property
+    def native_value(self):
+        if not self.coordinator.data:
+            return None
+        total = sum(
+            ch_data.get("power", 0.0)
+            for ch_data in self.coordinator.data.values()
+            if isinstance(ch_data, dict)
+        )
+        return round(total, 1)
 
 

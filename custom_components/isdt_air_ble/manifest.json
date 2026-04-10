@@ -1,6 +1,6 @@
 {
   "domain": "isdt_air_ble",
-  "name": "ISDT Air Charger",
+  "name": "ISDT Air BLE",
   "bluetooth": [
     { "service_uuid": "0000af00-0000-1000-8000-00805f9b34fb" }
   ],
@@ -12,5 +12,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/mtheli/isdt_air_ble/issues",
   "requirements": ["bleak>=0.21.0", "bleak-retry-connector>=3.5.0"],
-  "version": "0.3.0"
+  "version": "0.4.0"
 }

@@ -1,4 +1,4 @@
-"""Binary sensor platform for ISDT C4 Air integration."""
+"""Binary sensor platform for ISDT Air BLE integration."""
 
 import logging
 
@@ -8,24 +8,30 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
-from .helpers import main_device_info, slot_device_info
+from .const import DOMAIN, DeviceType, MASS2_PORT_COUNT
+from .helpers import main_device_info, slot_device_info, port_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    """Set up ISDT C4 Air binary sensors from a config entry."""
+    """Set up ISDT binary sensors from a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
     entities = [
         ISDTC4ConnectedSensor(coordinator),
     ]
-    for ch in range(6):
-        slot = ch + 1
-        entities.append(ISDTC4SlotActiveSensor(coordinator, slot, ch))
-        entities.append(ISDTC4BatteryInsertedSensor(coordinator, slot, ch))
-        entities.append(ISDTC4SlotErrorSensor(coordinator, slot, ch))
+
+    if coordinator.device_type == DeviceType.ADAPTER:
+        for port in range(MASS2_PORT_COUNT):
+            port_num = port + 1
+            entities.append(ISDTMASS2PortActiveSensor(coordinator, port_num, port))
+    else:
+        for ch in range(6):
+            slot = ch + 1
+            entities.append(ISDTC4SlotActiveSensor(coordinator, slot, ch))
+            entities.append(ISDTC4BatteryInsertedSensor(coordinator, slot, ch))
+            entities.append(ISDTC4SlotErrorSensor(coordinator, slot, ch))
 
     async_add_entities(entities)
 
@@ -174,3 +180,49 @@ class ISDTC4ConnectedSensor(CoordinatorEntity, BinarySensorEntity):
     def is_on(self):
         """Return True if the BLE connection is active."""
         return self.coordinator._connected
+
+
+# ---------------------------------------------------------------------------
+# MASS2 adapter binary sensors
+# ---------------------------------------------------------------------------
+
+
+class ISDTMASS2PortActiveSensor(CoordinatorEntity, BinarySensorEntity):
+    """Binary sensor indicating whether a USB port is delivering power."""
+
+    _attr_device_class = BinarySensorDeviceClass.POWER
+    _attr_has_entity_name = True
+    _attr_translation_key = "port_active"
+
+    def __init__(self, coordinator, port_num, channel):
+        super().__init__(coordinator)
+        self._channel = channel
+        address = coordinator.address
+        model = coordinator.model
+
+        self._attr_unique_id = f"{address}_port{port_num}_active"
+        self._attr_device_info = port_device_info(address, port_num, model)
+
+    @property
+    def is_on(self):
+        # The device reports status=1 when actively delivering power.
+        # Matches the manufacturer app behavior (no threshold logic).
+        if self.coordinator.data and self._channel in self.coordinator.data:
+            return self.coordinator.data[self._channel].get("status") == 1
+        return False
+
+    @property
+    def extra_state_attributes(self):
+        if not self.coordinator.data or self._channel not in self.coordinator.data:
+            return None
+        ch = self.coordinator.data[self._channel]
+        attrs = {}
+        protocol = ch.get("protocol_str")
+        if protocol and protocol != "none":
+            attrs["protocol"] = protocol
+        power = ch.get("power")
+        if power and power > 0:
+            attrs["power"] = f"{power:.1f} W"
+        return attrs if attrs else None
+
+

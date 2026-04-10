@@ -1,7 +1,8 @@
-"""Config flow for ISDT C4 Air integration."""
+"""Config flow for ISDT Air BLE integration."""
 
 import asyncio
 import logging
+import uuid
 from typing import Any
 
 import voluptuous as vol
@@ -16,14 +17,20 @@ from homeassistant.components.bluetooth import (
 )
 
 from .const import (
-    DOMAIN,
-    ISDT_MANUFACTURER_ID,
-    DEVICE_MODEL_MAP,
+    BIND_RESULT_OK,
+    BIND_RESULT_WAITING,
+    BIND_STATUS,
+    CONF_BIND_UUID,
     CONF_SCAN_INTERVAL,
-    DEFAULT_SCAN_INTERVAL,
     CHAR_UUID_AF01,
     CHAR_UUID_AF02,
+    CMD_BIND_REQ,
     CMD_HARDWARE_INFO_REQ,
+    DEFAULT_SCAN_INTERVAL,
+    DEVICE_MODEL_MAP,
+    DOMAIN,
+    ISDT_MANUFACTURER_ID,
+    RESP_BIND,
 )
 from .parser import parse_hardware_info
 
@@ -91,19 +98,29 @@ class ISDTConfigFlow(ConfigFlow, domain=DOMAIN):
         self._fetched_sw_version: str | None = None
         self._fetched_serial_number: str | None = None
         self._fetched_characteristics: dict[str, bool] = {}
+        self._bind_uuid: bytes = uuid.uuid4().bytes
 
-    async def _async_fetch_device_info(self, address: str) -> None:
-        """Connect to the BLE device and read hardware info + characteristics."""
+    async def _async_pair_and_fetch_device_info(self, address: str) -> None:
+        """Pair with the device and read hardware info.
+
+        Sends BindReq with status=1 (matching manufacturer app). The device
+        responds with:
+            BindResp result=0 → already known / accepted silently
+            BindResp result=1 → device beeps, waits for the user to press a
+                                button, then sends a second BindResp with
+                                result=0 once the user has confirmed.
+
+        Times out after 30 seconds if the user does not press the button.
+        """
         device = async_ble_device_from_address(self.hass, address)
         if not device:
             raise ConnectionError("BLE device not found")
 
         client = await establish_connection(
-            BleakClient, device, "ISDT Config", timeout=15
+            BleakClient, device, "ISDT Pairing", timeout=15
         )
 
         try:
-            # Check which characteristics are available
             services = client.services
             has_af01 = services.get_characteristic(CHAR_UUID_AF01) is not None
             has_af02 = services.get_characteristic(CHAR_UUID_AF02) is not None
@@ -112,35 +129,72 @@ class ISDTConfigFlow(ConfigFlow, domain=DOMAIN):
                 CHAR_UUID_AF02: has_af02,
             }
 
-            # Read hardware info via AF02
-            if has_af02:
-                hw_response = asyncio.Queue(maxsize=5)
+            if not has_af02:
+                raise ConnectionError("Device does not expose AF02 characteristic")
 
-                def hw_callback(sender, data):
-                    try:
-                        hw_response.put_nowait(data)
-                    except asyncio.QueueFull:
-                        pass
+            af02_response: asyncio.Queue = asyncio.Queue(maxsize=10)
 
-                await client.start_notify(CHAR_UUID_AF02, hw_callback)
-                await asyncio.sleep(0.3)
-
-                await client.write_gatt_char(
-                    CHAR_UUID_AF02, CMD_HARDWARE_INFO_REQ, response=False
-                )
-
+            def af02_callback(sender, data):
                 try:
-                    data = await asyncio.wait_for(hw_response.get(), timeout=3.0)
-                    result = parse_hardware_info(data)
-                    if result:
-                        self._fetched_hw_version, self._fetched_sw_version, self._fetched_serial_number = result
-                except asyncio.TimeoutError:
-                    _LOGGER.warning("Timeout waiting for hardware info response")
-
-                try:
-                    await client.stop_notify(CHAR_UUID_AF02)
-                except Exception:
+                    af02_response.put_nowait(data)
+                except asyncio.QueueFull:
                     pass
+
+            await client.start_notify(CHAR_UUID_AF02, af02_callback)
+            await asyncio.sleep(0.3)
+
+            bind_cmd = (
+                bytearray([CMD_BIND_REQ])
+                + bytearray(self._bind_uuid)
+                + bytearray([0x00, BIND_STATUS])
+            )
+            _LOGGER.info("Sending BindReq during config flow")
+            await client.write_gatt_char(CHAR_UUID_AF02, bind_cmd, response=False)
+
+            # The manufacturer app sends BindReq once and waits passively for
+            # a BindResp with bound=0. If the device needs pairing, it beeps,
+            # waits for the user to press a button, then sends bound=0
+            # spontaneously. We wait up to 30 seconds.
+            try:
+                async with asyncio.timeout(30.0):
+                    while True:
+                        data = await af02_response.get()
+                        if len(data) < 2 or data[0] != RESP_BIND:
+                            _LOGGER.debug(
+                                "Non-BindResp on AF02 while pairing: %s", data.hex(" ")
+                            )
+                            continue
+                        if data[1] == BIND_RESULT_OK:
+                            break
+                        if data[1] == BIND_RESULT_WAITING:
+                            _LOGGER.info("Device beeping, waiting for button press")
+                            continue
+                        raise ConnectionError(f"BindResp error result: {data[1]}")
+            except asyncio.TimeoutError as err:
+                raise ConnectionError("Pairing timed out — button was not pressed") from err
+
+            _LOGGER.info("Pairing successful")
+
+            # Read hardware info
+            await client.write_gatt_char(
+                CHAR_UUID_AF02, CMD_HARDWARE_INFO_REQ, response=False
+            )
+
+            try:
+                async with asyncio.timeout(3.0):
+                    while True:
+                        data = await af02_response.get()
+                        result = parse_hardware_info(data)
+                        if result:
+                            self._fetched_hw_version, self._fetched_sw_version, self._fetched_serial_number = result
+                            break
+            except asyncio.TimeoutError:
+                _LOGGER.warning("Timeout waiting for hardware info response")
+
+            try:
+                await client.stop_notify(CHAR_UUID_AF02)
+            except Exception:
+                pass
         finally:
             await client.disconnect()
 
@@ -174,26 +228,45 @@ class ISDTConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_bluetooth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Confirm discovery and connect to read device info."""
+        """Confirm discovery and proceed to pairing."""
         assert self._discovery_info is not None
-        errors: dict[str, str] = {}
 
         if user_input is not None:
-            try:
-                await self._async_fetch_device_info(self._discovery_info.address)
-                return await self.async_step_show_device_info()
-            except Exception:
-                _LOGGER.error(
-                    "Failed to connect to %s", self._discovery_info.address,
-                    exc_info=True,
-                )
-                errors["base"] = "cannot_connect"
+            return await self.async_step_pair()
 
         name = self._discovery_info.name or self._discovery_info.address
 
         return self.async_show_form(
             step_id="bluetooth_confirm",
             description_placeholders={"name": f"ISDT {self._device_model} ({name})"},
+        )
+
+    async def async_step_pair(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Pair with the device — user must press a button when it beeps."""
+        assert self._discovery_info is not None
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            try:
+                await self._async_pair_and_fetch_device_info(
+                    self._discovery_info.address
+                )
+                return await self.async_step_show_device_info()
+            except ConnectionError as err:
+                _LOGGER.warning("Pairing failed: %s", err)
+                errors["base"] = "pairing_failed"
+            except Exception:
+                _LOGGER.error(
+                    "Failed to pair with %s", self._discovery_info.address,
+                    exc_info=True,
+                )
+                errors["base"] = "cannot_connect"
+
+        return self.async_show_form(
+            step_id="pair",
+            description_placeholders={"model": self._device_model},
             errors=errors,
         )
 
@@ -210,6 +283,7 @@ class ISDTConfigFlow(ConfigFlow, domain=DOMAIN):
                     "hw_version": self._fetched_hw_version,
                     "sw_version": self._fetched_sw_version,
                     "serial_number": self._fetched_serial_number,
+                    CONF_BIND_UUID: self._bind_uuid.hex(),
                 },
             )
 

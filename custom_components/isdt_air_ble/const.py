@@ -1,4 +1,13 @@
+from enum import StrEnum
+
 DOMAIN = "isdt_air_ble"
+
+
+class DeviceType(StrEnum):
+    """Device type classification."""
+
+    CHARGER = "charger"
+    ADAPTER = "adapter"
 
 # Options
 CONF_SCAN_INTERVAL = "scan_interval"
@@ -13,6 +22,20 @@ CHAR_UUID_AF02 = "0000af02-0000-1000-8000-00805f9b34fb"  # Write (hardware info)
 #   Response CMD: 0x19 on AF02 (bound_status: 0=ok)
 CMD_BIND_REQ = 0x18
 RESP_BIND = 0x19
+
+# BindReq status byte (last byte). The manufacturer app always sends 1.
+# The device decides itself whether the UUID is known or pairing is needed.
+BIND_STATUS = 0x01
+
+# BindResp result codes (second byte after RESP_BIND)
+#   0 = bound (UUID known or just stored after user pressed the button)
+#   1 = waiting — device beeps and waits for the user to press a button;
+#       a second BindResp with code 0 follows after the press
+BIND_RESULT_OK = 0
+BIND_RESULT_WAITING = 1
+
+# Config entry data keys
+CONF_BIND_UUID = "bind_uuid"
 
 #   HardwareInfoReq: queries HW version, FW version, and serial number (once after connect)
 #   Response CMD: 0xE1 on AF02
@@ -87,9 +110,63 @@ DEVICE_MODEL_MAP = {
     "81c00000": "PB10DW",
     "81c00100": "PB25DW",
     "81c00200": "PB50DW",
+    "01350000": "MASS2",
     "C4Air": "C4 Air",
     "NP2Air": "NP2 Air",
     "LP2Air": "LP2 Air",
     "A4Air": "A4 Air",
     "A8Air": "A8 Air",
+}
+
+# Map model names to device types
+MODEL_DEVICE_TYPE_MAP: dict[str, DeviceType] = {
+    "MASS2": DeviceType.ADAPTER,
+}
+
+MASS2_PORT_COUNT = 8
+
+# MASS2 physical port layout (from MASS2Base.java line 119)
+# Slots 1-6 are USB-C, slots 7-8 are USB-A
+MASS2_PORT_LABELS = [
+    "USB-C1", "USB-C2", "USB-C3", "USB-C4",
+    "USB-C5", "USB-C6", "USB-A1", "USB-A2",
+]
+
+
+def get_device_type(model: str) -> DeviceType:
+    """Get device type for a model name. Defaults to CHARGER."""
+    return MODEL_DEVICE_TYPE_MAP.get(model, DeviceType.CHARGER)
+
+
+# ---------------------------------------------------------------------------
+# MASS2 adapter commands (written to CHAR_UUID_AF01)
+# ---------------------------------------------------------------------------
+
+# WorkStatusReq: polls real-time port status (voltage, current, protocol)
+# Response CMD: 0xC3
+CMD_MASS2_WORK_STATUS_REQ = bytearray([0x12, 0xC2])
+
+# SettingsReq: query device settings (beep, volume, mute schedule, alarms)
+# Response CMD: 0xCB
+CMD_MASS2_SETTINGS_REQ = bytearray([0x12, 0xCA])
+
+# SettingsSetReq: write device settings
+# (full 21-byte frame: scheduledMute, volume, operationSoundRepeatDay,
+#  openingTime[2], closingTime[2], 4 × (switchRepeatDay, openingTime[2]))
+CMD_MASS2_SETTINGS_SET = bytearray([0x12, 0xC8])
+
+# MASS2 response command bytes
+RESP_MASS2_WORK_STATUS = 0xC3   # WorkStatusResp (8 ports × 7 bytes)
+RESP_MASS2_SETTINGS    = 0xCB   # SettingsResp (21 bytes)
+
+# Frame header byte (byte 0) for normal MASS2 data packets.
+# Verified against MASS2Fragment.onBleByte: `if (bArr[0] != 49)` = 0x31.
+# Special packets like HardwareInfoResp (0xE1) use a different prefix.
+MASS2_FRAME_HEADER = 0x31
+
+# MASS2 charging protocol mapping
+MASS2_PROTOCOL_MAP = {
+    0: "none",
+    1: "PD",
+    2: "fast_charge",
 }

@@ -1,4 +1,4 @@
-"""BLE packet parser for ISDT C4 Air charger responses."""
+"""BLE packet parser for ISDT Air BLE device responses."""
 
 import logging
 
@@ -8,15 +8,19 @@ from .const import (
     RESP_ELECTRIC,
     RESP_WORKSTATE,
     RESP_IR,
+    RESP_MASS2_SETTINGS,
+    RESP_MASS2_WORK_STATUS,
     WORK_STATE_MAP,
     BATTERY_TYPE_MAP,
+    MASS2_PORT_COUNT,
+    MASS2_PROTOCOL_MAP,
 )
 
 _LOGGER = logging.getLogger(__name__)
 TRACE = 5  # HA supports trace level below DEBUG (10)
 
 
-def parse_responses(responses: list[bytes]) -> tuple[dict, bool | None]:
+def parse_charger_responses(responses: list[bytes]) -> tuple[dict, bool | None]:
     """Parse all BLE notification responses and assign to channels.
 
     Returns:
@@ -294,3 +298,170 @@ def parse_hardware_info(data: bytes) -> tuple[str, str, str] | None:
     serial_number = f"{device_id:016X}"
 
     return hw_version, sw_version, serial_number
+
+
+# ---------------------------------------------------------------------------
+# MASS2 adapter parsing
+# ---------------------------------------------------------------------------
+
+
+def parse_mass2_responses(responses: list[bytes]) -> tuple[dict | None, dict | None]:
+    """Parse MASS2 BLE notification responses.
+
+    Returns:
+        (ports, settings)
+        ports: dict {port (int): {key: value, ...}} when at least one valid
+               WorkStatusResp was parsed; None otherwise.
+        settings: dict with device settings when at least one SettingsResp
+                  was parsed; None otherwise.
+    """
+    ports: dict = {p: {} for p in range(MASS2_PORT_COUNT)}
+    ports_valid = False
+    settings: dict | None = None
+
+    for raw in responses:
+        _LOGGER.log(TRACE, "RAW DATA from MASS2 (%d bytes): %s", len(raw), raw.hex(" "))
+
+        if len(raw) < 3:
+            continue
+
+        cmd = raw[1]
+
+        if cmd == RESP_MASS2_WORK_STATUS:
+            if _parse_mass2_work_status(raw, ports):
+                ports_valid = True
+        elif cmd == RESP_MASS2_SETTINGS:
+            parsed_settings = _parse_mass2_settings(raw)
+            if parsed_settings is not None:
+                settings = parsed_settings
+        else:
+            _LOGGER.debug("Unknown MASS2 CMD 0x%02x: %s", cmd, raw.hex(" "))
+
+    return (ports if ports_valid else None, settings)
+
+
+def _parse_mass2_work_status(data: bytes, parsed: dict) -> bool:
+    """Parse MASS2 WorkStatusResp (CMD 0xC3).
+
+    Returns True if the response was complete and parsed successfully,
+    False if it was truncated (e.g. fragmented across BLE notifications)
+    so the caller can discard partial data.
+
+    Format (verified against MASS2WorkStatus.initData in the app):
+      Byte 0: 0x31 frame header
+      Byte 1: 0xC3 cmd word
+      Byte 2: total power in W (NOT port count — the app loops 8 times
+              regardless and only uses byte 2 for the total power display)
+      Per port (7 bytes each, starting at byte 3):
+        +0: status   (uint8) — 1 means actively delivering power
+        +1: protocol (uint8: 0=none, 1=PD, 2=fast_charge)
+        +2: flags    (uint8) — semantics unclear; manufacturer app stores
+                     this in mUsbAlarmI but never displays it as an alarm
+        +3-4: voltage (uint16 LE, mV)
+        +5-6: current (uint16 LE, mA)
+    """
+    # The app always parses exactly 8 ports regardless of byte 2.
+    expected_len = 3 + MASS2_PORT_COUNT * 7
+
+    if len(data) < expected_len:
+        _LOGGER.warning(
+            "Incomplete MASS2 WorkStatus response: %d bytes (need %d). "
+            "Likely BLE fragmentation due to small MTU.",
+            len(data), expected_len,
+        )
+        return False
+
+    pos = 3
+    for port in range(MASS2_PORT_COUNT):
+        if port not in parsed:
+            parsed[port] = {}
+
+        status = data[pos]
+        protocol = data[pos + 1]
+        alarm = data[pos + 2]
+        voltage_mv = int.from_bytes(data[pos + 3 : pos + 5], "little")
+        current_ma = int.from_bytes(data[pos + 5 : pos + 7], "little")
+
+        voltage = voltage_mv / 1000.0
+        current = current_ma / 1000.0
+        power = round(voltage * current, 2)
+
+        parsed[port].update({
+            "status": status,
+            "protocol": protocol,
+            "protocol_str": MASS2_PROTOCOL_MAP.get(protocol, "none"),
+            "alarm": alarm,
+            "voltage": voltage,
+            "current": current,
+            "power": power,
+        })
+
+        pos += 7
+
+    _LOGGER.debug("MASS2 WorkStatus parsed (8 ports)")
+    return True
+
+
+def _parse_mass2_settings(data: bytes) -> dict | None:
+    """Parse MASS2 SettingsResp (CMD 0xCB).
+
+    Format (verified against MASS2Settings.initData):
+      Byte 0: 0x31 frame header
+      Byte 1: 0xCB cmd word
+      Byte 2: scheduledMute (uint8) — beep mode (0=mute, !=0=beep)
+      Byte 3: volume (uint8) — 0=low, 1=medium, 2=high
+      Byte 4: operationSoundRepeatDay (uint8) — bit 7 = mute timer enabled
+      Byte 5-6: openingTime (uint16 LE) — mute timer start, in minutes
+      Byte 7-8: closingTime (uint16 LE) — mute timer end, in minutes
+      Bytes 9-20: 4 × AlarmClock (3 bytes each)
+    Total: 21 bytes
+    """
+    if len(data) < 21:
+        _LOGGER.warning(
+            "Incomplete MASS2 Settings response: %d bytes (need 21)", len(data),
+        )
+        return None
+
+    settings = {
+        "scheduledMute": data[2],
+        "volume": data[3],
+        "operationSoundRepeatDay": data[4],
+        "openingTime": int.from_bytes(data[5:7], "little"),
+        "closingTime": int.from_bytes(data[7:9], "little"),
+        "alarmClocks": [],
+    }
+    pos = 9
+    for _ in range(4):
+        settings["alarmClocks"].append({
+            "switchRepeatDay": data[pos],
+            "openingTime": int.from_bytes(data[pos + 1 : pos + 3], "little"),
+        })
+        pos += 3
+
+    _LOGGER.debug(
+        "MASS2 Settings: scheduledMute=%d, volume=%d, opSoundRepeat=0x%02x",
+        settings["scheduledMute"],
+        settings["volume"],
+        settings["operationSoundRepeatDay"],
+    )
+    return settings
+
+
+def build_mass2_settings_set_req(settings: dict) -> bytearray:
+    """Build a MASS2SettingsSetReq packet from a settings dict.
+
+    Mirrors MASS2SettingsSetReq.assemble() in the manufacturer app.
+    """
+    cmd = bytearray([0x12, 0xC8])
+    cmd.append(settings.get("scheduledMute", 0) & 0xFF)
+    cmd.append(settings.get("volume", 0) & 0xFF)
+    cmd.append(settings.get("operationSoundRepeatDay", 0) & 0xFF)
+    cmd += int(settings.get("openingTime", 0)).to_bytes(2, "little")
+    cmd += int(settings.get("closingTime", 0)).to_bytes(2, "little")
+    for alarm in settings.get("alarmClocks", []):
+        cmd.append(alarm.get("switchRepeatDay", 0) & 0xFF)
+        cmd += int(alarm.get("openingTime", 0)).to_bytes(2, "little")
+    # Pad with default alarms if fewer than 4 were provided
+    while len(cmd) < 21:
+        cmd.append(0)
+    return cmd

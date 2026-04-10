@@ -20,6 +20,9 @@ from homeassistant.core import callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    BIND_RESULT_OK,
+    BIND_RESULT_WAITING,
+    BIND_STATUS,
     CHAR_UUID_AF01,
     CHAR_UUID_AF02,
     CMD_ALARM_TONE_REQ,
@@ -28,11 +31,24 @@ from .const import (
     CMD_ELECTRIC_REQ,
     CMD_HARDWARE_INFO_REQ,
     CMD_IR_REQ,
+    CMD_MASS2_SETTINGS_REQ,
+    CMD_MASS2_WORK_STATUS_REQ,
     CMD_WORKSTATE_REQ,
     DEFAULT_SCAN_INTERVAL,
+    DeviceType,
+    MASS2_FRAME_HEADER,
+    MASS2_PORT_COUNT,
     RESP_BIND,
+    RESP_MASS2_SETTINGS,
+    RESP_MASS2_WORK_STATUS,
+    get_device_type,
 )
-from .parser import parse_hardware_info, parse_responses
+from .parser import (
+    build_mass2_settings_set_req,
+    parse_charger_responses,
+    parse_hardware_info,
+    parse_mass2_responses,
+)
 
 _LOGGER = logging.getLogger(__name__)
 TRACE = 5  # HA supports trace level below DEBUG (10)
@@ -45,8 +61,8 @@ _BACKOFF_MAX = 300
 _CMD_INTERVAL = 0.1
 
 
-def _build_command_list() -> list[bytearray]:
-    """Build the circular command list (like manufacturer app).
+def _build_charger_command_list() -> list[bytearray]:
+    """Build the circular command list for charger devices.
 
     Order: AlarmTone, then per channel: WorkState, Electric, IR
     Total: 1 + 6*3 = 19 commands.
@@ -59,10 +75,18 @@ def _build_command_list() -> list[bytearray]:
     return commands
 
 
-class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
-    """Coordinator that keeps a persistent BLE connection to an ISDT charger."""
+def _build_adapter_command_list() -> list[bytearray]:
+    """Build the circular command list for adapter devices (MASS2).
 
-    def __init__(self, hass, address, model="C4 Air", scan_interval=DEFAULT_SCAN_INTERVAL):
+    Single command: WorkStatusReq polls all 8 ports at once.
+    """
+    return [CMD_MASS2_WORK_STATUS_REQ]
+
+
+class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
+    """Coordinator that keeps a persistent BLE connection to an ISDT device."""
+
+    def __init__(self, hass, address, model="C4 Air", scan_interval=DEFAULT_SCAN_INTERVAL, bind_uuid: bytes | None = None):
         super().__init__(
             hass,
             _LOGGER,
@@ -71,6 +95,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         )
         self.address = address
         self.model = model
+        self.device_type = get_device_type(model)
         self.scan_interval_seconds = scan_interval
         self.data = {}
 
@@ -81,7 +106,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         self._hw_info_fetched = False
         self._device_registry_updated = False
 
-        # Alarm tone state
+        # Alarm tone state (charger only)
         self._alarm_tone_on: bool | None = None
 
         # Persistent BLE connection
@@ -90,15 +115,31 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         self._response_queue: asyncio.Queue = asyncio.Queue(maxsize=200)
         self._notification_started = False
 
+        # Notification reassembly buffer for MASS2 (BLE notifications can be
+        # fragmented when MTU is small — a 59-byte WorkStatus response will
+        # arrive as 3 notifications with a 23-byte MTU). We accumulate the
+        # bytes here and emit complete responses to the queue.
+        self._mass2_buffer = bytearray()
+
+        # Cached MASS2 device settings (beep, volume, mute schedule, alarms).
+        # Populated once on connect from a SettingsResp (cmd 0xCB).
+        self._mass2_settings: dict | None = None
+        self._mass2_settings_requested = False
+
         # Live monitoring
         self._connection_lock = asyncio.Lock()
         self._live_task: asyncio.Task | None = None
 
-        # Circular command list
-        self._commands = _build_command_list()
+        # Circular command list (device-type-specific)
+        if self.device_type == DeviceType.ADAPTER:
+            self._commands = _build_adapter_command_list()
+        else:
+            self._commands = _build_charger_command_list()
 
-        # Bind UUID (random per instance, like manufacturer app)
-        self._bind_uuid = uuid.uuid4().bytes
+        # Bind UUID — persistent per device. Must stay stable across restarts
+        # so the device recognizes us and doesn't require re-pairing (which
+        # would beep and need a button press).
+        self._bind_uuid = bind_uuid if bind_uuid else uuid.uuid4().bytes
 
         # Bluetooth advertisement callback for instant reconnection
         self._device_available = asyncio.Event()
@@ -106,6 +147,16 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
 
         # Change detection: only push to HA when sensor data actually changed
         self._last_pushed_data: dict | None = None
+
+    @property
+    def alarm_tone_on(self) -> bool | None:
+        """Return alarm tone state (charger only)."""
+        return self._alarm_tone_on
+
+    @property
+    def mass2_settings(self) -> dict | None:
+        """Return cached MASS2 device settings (adapter only)."""
+        return self._mass2_settings
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -217,6 +268,11 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
 
                 # After cycle completion, collect responses and push data
                 if cmd_index == 0:
+                    # Adapter has only 1 command per cycle — wait for
+                    # the response before collecting (matches app behavior)
+                    if self.device_type == DeviceType.ADAPTER:
+                        await asyncio.sleep(0.5)
+
                     await self._collect_and_push(last_push_time)
                     last_push_time = asyncio.get_event_loop().time()
 
@@ -248,10 +304,24 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         if not responses:
             return
 
-        # Parsing response
+        # Parsing response (device-type-specific)
         _LOGGER.debug("Received %d responses", len(responses))
-        parsed, alarm_tone_on = parse_responses(responses)
-        self._alarm_tone_on = alarm_tone_on
+        if self.device_type == DeviceType.ADAPTER:
+            parsed_ports, parsed_settings = parse_mass2_responses(responses)
+            if parsed_settings is not None:
+                self._mass2_settings = parsed_settings
+                _LOGGER.debug("MASS2 settings updated from device")
+            if parsed_ports is None:
+                # No complete WorkStatus response — keep existing data
+                # instead of overwriting it with empty values. Push current
+                # data anyway so settings entities update.
+                if parsed_settings is not None and self.data:
+                    self.async_set_updated_data(self.data)
+                return
+            parsed = parsed_ports
+        else:
+            parsed, alarm_tone_on = parse_charger_responses(responses)
+            self._alarm_tone_on = alarm_tone_on
 
         # Fetch hardware info if not yet done
         if not self._hw_info_fetched:
@@ -300,10 +370,15 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             self._client = await establish_connection(
                 BleakClient, ble_device, f"ISDT {self.model}", timeout=15
             )
+            mtu = getattr(self._client, "mtu_size", None)
             _LOGGER.debug(
-                "Connected, services available: %d",
+                "Connected, services available: %d, MTU=%s",
                 len(self._client.services.services),
+                mtu,
             )
+            # Reset reassembly buffer + settings request flag on every (re)connect
+            self._mass2_buffer = bytearray()
+            self._mass2_settings_requested = False
             await asyncio.sleep(1.0)
 
             await self._setup_notifications()
@@ -314,6 +389,19 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             # Fetch hardware info once
             if not self._hw_info_fetched:
                 await self._fetch_hardware_info()
+
+            # For MASS2 adapters: query settings once after connect.
+            # The response (cmd 0xCB) will be picked up by the notification
+            # handler and stored in self._mass2_settings.
+            if (
+                self.device_type == DeviceType.ADAPTER
+                and not self._mass2_settings_requested
+            ):
+                _LOGGER.debug("Sending MASS2 SettingsReq")
+                await self._client.write_gatt_char(
+                    CHAR_UUID_AF01, CMD_MASS2_SETTINGS_REQ, response=False
+                )
+                self._mass2_settings_requested = True
 
         except Exception as err:
             _LOGGER.warning("Failed to connect: %s", err)
@@ -342,11 +430,14 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         self._client.set_disconnected_callback(disconnected_callback)
 
         def notification_callback(sender, data):
-            _LOGGER.log(TRACE, "Notification received: %s", data.hex(" "))
-            try:
-                self._response_queue.put_nowait(data)
-            except asyncio.QueueFull:
-                _LOGGER.warning("Response queue full, dropping packet")
+            _LOGGER.log(TRACE, "Notification received (%d bytes): %s", len(data), data.hex(" "))
+            if self.device_type == DeviceType.ADAPTER:
+                self._handle_adapter_notification(data)
+            else:
+                try:
+                    self._response_queue.put_nowait(data)
+                except asyncio.QueueFull:
+                    _LOGGER.warning("Response queue full, dropping packet")
 
         await self._client.start_notify(CHAR_UUID_AF01, notification_callback)
         self._notification_started = True
@@ -354,13 +445,89 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         await asyncio.sleep(0.5)
         _LOGGER.debug("Notifications started on %s", CHAR_UUID_AF01)
 
+    def _handle_adapter_notification(self, data: bytes) -> None:
+        """Reassemble fragmented MASS2 notifications into complete responses.
+
+        Frame format (verified against MASS2Fragment.onBleByte in the
+        manufacturer app):
+            byte 0: 0x31 = frame header for normal MASS2 data packets
+            byte 1: cmd word (0xC3 = WorkStatusResp, 0xC5/0xC7/0xCB = others)
+            byte 2: payload-specific (port_count for WorkStatus)
+            byte 3+: payload
+
+        With the default ATT MTU of 23, a 59-byte WorkStatus response arrives
+        in 3 notifications and we have to reassemble it. We resync by looking
+        for the 0x31 frame header.
+        """
+        self._mass2_buffer.extend(data)
+
+        while len(self._mass2_buffer) >= 2:
+            # Resync: discard everything up to the next 0x31 frame header
+            if self._mass2_buffer[0] != MASS2_FRAME_HEADER:
+                idx = self._mass2_buffer.find(MASS2_FRAME_HEADER)
+                if idx == -1:
+                    _LOGGER.debug(
+                        "Discarding %d bytes — no MASS2 frame header found: %s",
+                        len(self._mass2_buffer),
+                        self._mass2_buffer.hex(" "),
+                    )
+                    self._mass2_buffer.clear()
+                    return
+                _LOGGER.debug(
+                    "Resyncing: dropped %d bytes before frame header", idx,
+                )
+                del self._mass2_buffer[:idx]
+
+            if len(self._mass2_buffer) < 3:
+                return
+
+            cmd = self._mass2_buffer[1]
+
+            if cmd == RESP_MASS2_WORK_STATUS:
+                # Always 8 ports (3 header + 8 * 7 = 59 bytes).
+                # Byte 2 is total power, not port count.
+                expected = 3 + MASS2_PORT_COUNT * 7
+            elif cmd == RESP_MASS2_SETTINGS:
+                # Settings response: scheduledMute, volume, opSoundRepeat,
+                # openingTime[2], closingTime[2], 4 × (switchRepeatDay,
+                # openingTime[2]) = 21 bytes
+                expected = 21
+            else:
+                # Unknown cmd word. We don't know the length, so log and
+                # try to find the next frame header.
+                _LOGGER.debug(
+                    "Unknown MASS2 cmd 0x%02x, skipping frame", cmd,
+                )
+                del self._mass2_buffer[0]
+                continue
+
+            if len(self._mass2_buffer) < expected:
+                return  # need more data
+
+            response = bytes(self._mass2_buffer[:expected])
+            del self._mass2_buffer[:expected]
+            try:
+                self._response_queue.put_nowait(response)
+            except asyncio.QueueFull:
+                _LOGGER.warning("Response queue full, dropping packet")
+
     async def _send_bind_request(self):
         """Send bind request on AF02 (matching manufacturer app protocol).
 
-        Packet: [0x18, uuid[0..15], 0x00, status=0x00]  (19 bytes)
-        Response: [0x19, bound_status]  (bound_status 0=ok)
+        Packet: [0x18, uuid[0..15], 0x00, status=1]  (19 bytes)
+
+        The manufacturer app sends BindReq once and then passively waits for
+        a BindResp with result=0. The device behavior:
+            - If the UUID is already known: device replies with bound=0 immediately
+            - If the UUID is unknown: device beeps and waits for the user to
+              press a button. After the press, the device sends bound=0
+              spontaneously (the app does not retransmit).
+
+        We mirror this: send once, then wait up to 30 seconds for any
+        BindResp with bound=0. Any intermediate bound=1 just means "still
+        waiting for user".
         """
-        bind_response: asyncio.Queue = asyncio.Queue(maxsize=5)
+        bind_response: asyncio.Queue = asyncio.Queue(maxsize=20)
 
         def af02_callback(sender, data):
             _LOGGER.debug("AF02 bind response (%d bytes): %s", len(data), data.hex(" "))
@@ -373,22 +540,37 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             await self._client.start_notify(CHAR_UUID_AF02, af02_callback)
             await asyncio.sleep(0.3)
 
-            cmd = bytearray([CMD_BIND_REQ]) + bytearray(self._bind_uuid) + bytearray([0x00, 0x00])
+            cmd = (
+                bytearray([CMD_BIND_REQ])
+                + bytearray(self._bind_uuid)
+                + bytearray([0x00, BIND_STATUS])
+            )
             _LOGGER.debug("Sending BindReq on AF02: %s", cmd.hex(" "))
             await self._client.write_gatt_char(CHAR_UUID_AF02, cmd, response=False)
 
+            # Wait up to 30s for a successful BindResp.
             try:
-                data = await asyncio.wait_for(bind_response.get(), timeout=3.0)
-                if len(data) >= 2 and data[0] == RESP_BIND:
-                    bound_status = data[1]
-                    if bound_status == 0:
-                        _LOGGER.info("Bind successful")
-                    else:
-                        _LOGGER.warning("Bind response status: %d", bound_status)
-                else:
-                    _LOGGER.debug("Unexpected AF02 response: %s", data.hex(" "))
+                async with asyncio.timeout(30.0):
+                    while True:
+                        data = await bind_response.get()
+                        if len(data) < 2 or data[0] != RESP_BIND:
+                            _LOGGER.debug(
+                                "Non-BindResp on AF02 while pairing: %s", data.hex(" ")
+                            )
+                            continue
+                        if data[1] == BIND_RESULT_OK:
+                            _LOGGER.info("Bind successful")
+                            return
+                        if data[1] == BIND_RESULT_WAITING:
+                            _LOGGER.warning(
+                                "Device requires pairing — please press a button on the device"
+                            )
+                            continue
+                        _LOGGER.warning("Unknown BindResp result: %d", data[1])
             except asyncio.TimeoutError:
-                _LOGGER.warning("Timeout waiting for BindResp on AF02")
+                _LOGGER.warning(
+                    "Timeout waiting for BindResp on AF02 — pairing may have failed"
+                )
 
         except Exception as err:
             _LOGGER.warning("Failed to send bind request: %s", err)
@@ -438,6 +620,42 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             await self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False)
             self._alarm_tone_on = enable
             _LOGGER.info("Alarm tone %s", "enabled" if enable else "disabled")
+
+    # ------------------------------------------------------------------
+    # MASS2 settings (beep, volume)
+    # ------------------------------------------------------------------
+
+    async def _async_send_mass2_settings(self, updates: dict) -> None:
+        """Merge updates into the cached settings and send to the device."""
+        if self._mass2_settings is None:
+            _LOGGER.warning("Cannot set MASS2 settings — not yet read from device")
+            return
+
+        async with self._connection_lock:
+            if not self._client or not self._client.is_connected:
+                _LOGGER.warning("Cannot set MASS2 settings — not connected")
+                return
+
+            # Merge: keep all existing fields, override only the updates.
+            new_settings = dict(self._mass2_settings)
+            new_settings.update(updates)
+            cmd = build_mass2_settings_set_req(new_settings)
+            _LOGGER.debug("Sending MASS2 SettingsSetReq: %s", cmd.hex(" "))
+            await self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False)
+
+            # Optimistic local update — the device usually echoes the new
+            # state in the next SettingsResp anyway.
+            self._mass2_settings = new_settings
+            if self.data:
+                self.async_set_updated_data(self.data)
+
+    async def async_set_mass2_beep(self, value: int) -> None:
+        """Set the MASS2 beep mode (scheduledMute field)."""
+        await self._async_send_mass2_settings({"scheduledMute": value})
+
+    async def async_set_mass2_volume(self, value: int) -> None:
+        """Set the MASS2 buzzer volume (0=low, 1=medium, 2=high)."""
+        await self._async_send_mass2_settings({"volume": value})
 
     # ------------------------------------------------------------------
     # Hardware info (one-time query after connect)

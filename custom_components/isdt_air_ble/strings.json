@@ -1,14 +1,18 @@
 {
   "config": {
-    "flow_title": "ISDT {name}",
+    "flow_title": "{name}",
     "step": {
       "user": {
-        "title": "Set up ISDT Charger",
-        "description": "Confirm the detected ISDT charger to add it to Home Assistant."
+        "title": "Set up ISDT Device",
+        "description": "Confirm the detected ISDT device to add it to Home Assistant."
       },
       "bluetooth_confirm": {
         "title": "Confirm detected device",
-        "description": "Do you want to add **{name}** to Home Assistant?\n\nClick Submit to connect and read device info."
+        "description": "Do you want to add **{name}** to Home Assistant?\n\nClick Submit to start pairing."
+      },
+      "pair": {
+        "title": "Pair with {model}",
+        "description": "Click Submit, then **press a button on the device** when it beeps.\n\nThe device will play a confirmation tone and wait for you to confirm pairing. You have 30 seconds to press the button after clicking Submit."
       },
       "show_device_info": {
         "title": "Device Info",
@@ -16,22 +20,23 @@
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to the charger. Ensure it is powered on and in range."
+      "cannot_connect": "Failed to connect to the device. Ensure it is powered on and in range.",
+      "pairing_failed": "Pairing timed out. Please try again and press a button on the device when it beeps."
     },
     "abort": {
       "already_configured": "Device is already configured.",
-      "no_devices_found": "No ISDT charger found. Ensure it is powered on and in range."
+      "no_devices_found": "No ISDT device found. Ensure it is powered on and in range."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "ISDT Charger Options",
+        "title": "ISDT Device Options",
         "data": {
           "scan_interval": "Poll interval (seconds)"
         },
         "data_description": {
-          "scan_interval": "How often the charger is queried via Bluetooth (3–300 seconds)."
+          "scan_interval": "How often the device is queried via Bluetooth (3–300 seconds)."
         }
       }
     }
@@ -99,7 +104,35 @@
       "cell_13": { "name": "Cell 13 Voltage" },
       "cell_14": { "name": "Cell 14 Voltage" },
       "cell_15": { "name": "Cell 15 Voltage" },
-      "cell_16": { "name": "Cell 16 Voltage" }
+      "cell_16": { "name": "Cell 16 Voltage" },
+      "port_status": {
+        "name": "{port} Status",
+        "state": {
+          "off": "Off",
+          "idle": "Idle",
+          "active": "Active"
+        }
+      },
+      "port_voltage": {
+        "name": "Voltage"
+      },
+      "port_current": {
+        "name": "Current"
+      },
+      "port_power": {
+        "name": "Power"
+      },
+      "port_protocol": {
+        "name": "Protocol",
+        "state": {
+          "none": "None",
+          "PD": "USB PD",
+          "fast_charge": "Fast Charge"
+        }
+      },
+      "total_power": {
+        "name": "Total Power"
+      }
     },
     "binary_sensor": {
       "connected": {
@@ -113,11 +146,24 @@
       },
       "slot_error": {
         "name": "Error"
+      },
+      "port_active": {
+        "name": "Active"
       }
     },
     "switch": {
       "beep": {
         "name": "Beep"
+      }
+    },
+    "select": {
+      "volume": {
+        "name": "Volume",
+        "state": {
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
       }
     }
   }
