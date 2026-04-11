@@ -34,6 +34,12 @@ from .const import (
     CMD_MASS2_SETTINGS_REQ,
     CMD_MASS2_WORK_STATUS_REQ,
     CMD_WORKSTATE_REQ,
+    CONF_PHANTOM_DEBOUNCE,
+    CONF_PHANTOM_SUSTAIN,
+    CONF_PHANTOM_THRESHOLD,
+    DEFAULT_PHANTOM_DEBOUNCE,
+    DEFAULT_PHANTOM_SUSTAIN,
+    DEFAULT_PHANTOM_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
     DeviceType,
     MASS2_FRAME_HEADER,
@@ -44,6 +50,7 @@ from .const import (
     get_device_type,
 )
 from .parser import (
+    build_mass2_set_time_req,
     build_mass2_settings_set_req,
     parse_charger_responses,
     parse_hardware_info,
@@ -59,6 +66,24 @@ _BACKOFF_MAX = 300
 
 # Command interval matching manufacturer app (100ms)
 _CMD_INTERVAL = 0.1
+
+# Phantom-filter: low-power threshold for the sustained-active path.
+# Below this, a port is considered definitely phantom/off regardless
+# of duration. Above it (but below `phantom_threshold`), the port must
+# stay continuously above for `phantom_sustain` seconds before it's
+# reported as really charging (catches slow chargers like electric
+# toothbrushes at ~0.5 W).
+_PHANTOM_LOW_POWER = 0.3  # watts
+
+# Phantom-filter: "disconnect floor". Once a port is considered active,
+# the down-transition waits until power drops below this value for at
+# least `phantom_debounce` seconds. This is *much* lower than the
+# sustained-activation threshold so that devices with noisy standby
+# draw (e.g. a C4 Air charger powered via MASS2 C3 pulsing between
+# 0.2 W and 2 W due to MCU/BLE activity) stay "active" rather than
+# flapping each time they dip below the 0.3 W activation floor. Real
+# disconnects always drop to 0 W.
+_PHANTOM_DISCONNECT_FLOOR = 0.05  # watts
 
 
 def _build_charger_command_list() -> list[bytearray]:
@@ -86,7 +111,17 @@ def _build_adapter_command_list() -> list[bytearray]:
 class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
     """Coordinator that keeps a persistent BLE connection to an ISDT device."""
 
-    def __init__(self, hass, address, model="C4 Air", scan_interval=DEFAULT_SCAN_INTERVAL, bind_uuid: bytes | None = None):
+    def __init__(
+        self,
+        hass,
+        address,
+        model="C4 Air",
+        scan_interval=DEFAULT_SCAN_INTERVAL,
+        bind_uuid: bytes | None = None,
+        phantom_threshold: float = DEFAULT_PHANTOM_THRESHOLD,
+        phantom_debounce: float = DEFAULT_PHANTOM_DEBOUNCE,
+        phantom_sustain: float = DEFAULT_PHANTOM_SUSTAIN,
+    ):
         super().__init__(
             hass,
             _LOGGER,
@@ -97,7 +132,16 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         self.model = model
         self.device_type = get_device_type(model)
         self.scan_interval_seconds = scan_interval
+        self.phantom_threshold = phantom_threshold
+        self.phantom_debounce = phantom_debounce
+        self.phantom_sustain = phantom_sustain
         self.data = {}
+
+        # Per-port phantom-filter state with hysteresis + sustained
+        # low-power detection. See _apply_phantom_filter for details.
+        self._port_active: dict[int, bool] = {}
+        self._port_below_since: dict[int, float] = {}
+        self._port_sustain_since: dict[int, float] = {}
 
         # Hardware info (populated once after first connect)
         self.hw_version: str | None = None
@@ -256,7 +300,14 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                         except asyncio.QueueEmpty:
                             break
 
-                # Send next command in the cycle
+                # Send next command in the cycle. For adapters, clear the
+                # reassembly buffer first so a stale partial frame from the
+                # previous cycle cannot drift into the new response (would
+                # otherwise mis-align port data when a notification was
+                # dropped — the 0x31 resync byte also occurs inside payloads).
+                if self.device_type == DeviceType.ADAPTER:
+                    self._mass2_buffer.clear()
+
                 cmd = self._commands[cmd_index]
                 await self._client.write_gatt_char(
                     CHAR_UUID_AF01, cmd, response=False
@@ -318,6 +369,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 if parsed_settings is not None and self.data:
                     self.async_set_updated_data(self.data)
                 return
+            self._apply_phantom_filter(parsed_ports)
             parsed = parsed_ports
         else:
             parsed, alarm_tone_on = parse_charger_responses(responses)
@@ -355,6 +407,142 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 return True
         return False
 
+    def _apply_phantom_filter(self, parsed_ports: dict) -> None:
+        """Filter per-port phantom pulses with three-path detection.
+
+        Charging pads like Apple MagSafe (~0.2 W) and Samsung wireless
+        dock (up to ~0.6 W) periodically probe for devices in standby.
+        These pulses would otherwise flip port_status and spam the
+        recorder. Meanwhile some small devices (e.g. electric
+        toothbrushes) genuinely charge at 0.5 W continuously — a pure
+        threshold check would hide them forever.
+
+        Three paths run per port, in priority order:
+
+        1. **Instant-active** — power ≥ ``phantom_threshold``. Real
+           charging at normal levels (watch 2 W, phone 15 W) snaps to
+           active on the very next poll. No waiting.
+
+        2. **Sustained low-power** — power between ``_PHANTOM_LOW_POWER``
+           and ``phantom_threshold``, continuously above low for at
+           least ``phantom_sustain`` seconds. Catches slow chargers
+           (toothbrush etc.). Samsung-style pulses at 0.5 W / 2–3 s
+           never reach the window because they return to 0 between
+           pulses, resetting the sustain timer.
+
+        3. **Down-hysteresis** — once a port is active, it stays
+           active as long as *any* non-trivial load is present
+           (above ``_PHANTOM_DISCONNECT_FLOOR``, ~0.05 W). Only when
+           power drops to effectively zero for ``phantom_debounce``
+           seconds does the port transition back to off. This covers
+           both brief PD re-negotiation dips and devices with noisy
+           standby draw that oscillate around the activation floor
+           (e.g. a C4 Air charger powered via MASS2 C3).
+
+        Any port below ``_PHANTOM_LOW_POWER`` when not already active is
+        masked to zeroed values so the recorder doesn't see the phantom.
+
+        Disabled when ``phantom_threshold`` <= 0.
+        """
+        threshold = self.phantom_threshold
+        if threshold <= 0:
+            return
+
+        debounce = self.phantom_debounce
+        sustain_seconds = self.phantom_sustain
+        low_power = _PHANTOM_LOW_POWER
+        disconnect_floor = _PHANTOM_DISCONNECT_FLOOR
+        now = asyncio.get_event_loop().time()
+
+        for port, ch in parsed_ports.items():
+            if not isinstance(ch, dict):
+                continue
+            power = ch.get("power") or 0.0
+
+            # Path 1: instant active (clear charging). Override the
+            # device status byte to 1 so the port_status sensor always
+            # follows our filter decision, not the raw (sometimes
+            # momentarily 0) device reading.
+            if power >= threshold:
+                self._port_active[port] = True
+                self._port_sustain_since.pop(port, None)
+                self._port_below_since.pop(port, None)
+                ch["status"] = 1
+                continue
+
+            # Path 3: already active, apply down-hysteresis. Stay active
+            # for any non-trivial load (>= disconnect floor). Only drop
+            # to off when power is effectively zero for `debounce` seconds.
+            # Raw voltage/current/power/protocol are passed through
+            # untouched so the history reflects honest device data —
+            # only the status byte is overridden to prevent the
+            # port_state badge from flipping on every 0 W dip.
+            if self._port_active.get(port):
+                ch["status"] = 1
+                if power >= disconnect_floor:
+                    self._port_below_since.pop(port, None)
+                    continue
+                below_since = self._port_below_since.get(port)
+                if below_since is None:
+                    self._port_below_since[port] = now
+                    continue  # bridge the gap, pass real (tiny) values
+                if now - below_since >= debounce:
+                    self._port_active[port] = False
+                    self._port_below_since.pop(port, None)
+                    self._mask_port_as_off(ch)
+                # else: still inside hysteresis window, keep active
+                continue
+
+            # Path 2: currently off, check for sustained low-power
+            # charging (slow chargers like toothbrushes).
+            if power < low_power:
+                # Definitely phantom or nothing. Reset sustain timer.
+                self._port_sustain_since.pop(port, None)
+                self._mask_port_as_off(ch)
+                continue
+
+            # Between low_power and threshold, port is off → build up
+            # sustained detection.
+            sustain_since = self._port_sustain_since.get(port)
+            if sustain_since is None:
+                self._port_sustain_since[port] = now
+                self._mask_port_as_off(ch)
+                continue
+            if now - sustain_since >= sustain_seconds:
+                # Continuously above low-power long enough → real charge.
+                self._port_active[port] = True
+                self._port_sustain_since.pop(port, None)
+                ch["status"] = 1
+                continue  # pass real values through
+            # Still within the sustain window — hide for now.
+            self._mask_port_as_off(ch)
+
+        # Recompute the device-level total from the (possibly masked)
+        # per-port values. The device's own byte-2 total accumulates the
+        # raw phantom pulses across all ports — without this, "Total
+        # Power" can show 1 W even when every port is filtered to 0.
+        if "_total_power" in parsed_ports:
+            filtered_total = sum(
+                ch.get("power") or 0.0
+                for ch in parsed_ports.values()
+                if isinstance(ch, dict)
+            )
+            parsed_ports["_total_power"] = round(filtered_total)
+
+    @staticmethod
+    def _mask_port_as_off(ch: dict) -> None:
+        """Zero out a port's dynamic fields so it appears idle.
+
+        Leaves internal-use fields like ``alarm`` untouched so the
+        raw device report is still available if needed.
+        """
+        ch["status"] = 0
+        ch["voltage"] = 0.0
+        ch["current"] = 0.0
+        ch["power"] = 0.0
+        ch["protocol"] = 0
+        ch["protocol_str"] = "none"
+
     # ------------------------------------------------------------------
     # Connection management
     # ------------------------------------------------------------------
@@ -370,6 +558,19 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             self._client = await establish_connection(
                 BleakClient, ble_device, f"ISDT {self.model}", timeout=15
             )
+
+            # Negotiate a larger ATT MTU so the 59-byte MASS2 WorkStatus
+            # response arrives in a single notification instead of 3
+            # fragments. The manufacturer app requests MTU=240; under BlueZ
+            # we have to trigger negotiation explicitly via _acquire_mtu()
+            # (otherwise BlueZ keeps the default 23-byte MTU).
+            backend = getattr(self._client, "_backend", None)
+            if backend is not None and hasattr(backend, "_acquire_mtu"):
+                try:
+                    await backend._acquire_mtu()
+                except Exception as err:
+                    _LOGGER.debug("MTU negotiation failed: %s", err)
+
             mtu = getattr(self._client, "mtu_size", None)
             _LOGGER.debug(
                 "Connected, services available: %d, MTU=%s",
@@ -402,6 +603,14 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                     CHAR_UUID_AF01, CMD_MASS2_SETTINGS_REQ, response=False
                 )
                 self._mass2_settings_requested = True
+
+            # For MASS2 adapters: push current wall-clock time so per-port
+            # schedules and alarm clocks fire at the correct times even
+            # when the user never opens the manufacturer app. Mirrors
+            # MASS2Fragment.isConnected(true) which sends this on every
+            # successful connect.
+            if self.device_type == DeviceType.ADAPTER:
+                await self._send_mass2_set_time()
 
         except Exception as err:
             _LOGGER.warning("Failed to connect: %s", err)
@@ -656,6 +865,34 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
     async def async_set_mass2_volume(self, value: int) -> None:
         """Set the MASS2 buzzer volume (0=low, 1=medium, 2=high)."""
         await self._async_send_mass2_settings({"volume": value})
+
+    async def _send_mass2_set_time(self) -> None:
+        """Push the current local wall-clock time to the device RTC.
+
+        Mirrors MASS2Fragment.isConnected(true) in the manufacturer app:
+        sent on every successful connect so per-port schedules and alarm
+        clocks fire at the right time even when the user never installs
+        the app. The device has no built-in NTP — without this it stays
+        on whatever time it booted with (typically 2000-01-01).
+        """
+        from homeassistant.util import dt as dt_util
+
+        now = dt_util.now()  # tz-aware, in HA's configured timezone
+        offset = now.utcoffset()
+        offset_hours = int(offset.total_seconds() // 3600) if offset else 0
+
+        cmd = build_mass2_set_time_req(now, offset_hours, is_24h=True)
+        try:
+            await self._client.write_gatt_char(
+                CHAR_UUID_AF01, cmd, response=False
+            )
+            _LOGGER.debug(
+                "MASS2 RTC set to %s (UTC%+d)",
+                now.strftime("%Y-%m-%d %H:%M:%S"),
+                offset_hours,
+            )
+        except Exception as err:
+            _LOGGER.debug("Failed to set MASS2 RTC: %s", err)
 
     # ------------------------------------------------------------------
     # Hardware info (one-time query after connect)

@@ -603,13 +603,18 @@ class ISDTMASS2PortStatusSensor(CoordinatorEntity, SensorEntity):
 
 
 class ISDTMASS2TotalPowerSensor(CoordinatorEntity, SensorEntity):
-    """Total power across all USB ports."""
+    """Total power across all USB ports.
+
+    Reads the device-reported total (byte 2 of WorkStatusResp), which
+    matches what the manufacturer app shows. Falls back to summing the
+    per-port power values if the device value is not yet available.
+    """
 
     _attr_has_entity_name = True
     _attr_native_unit_of_measurement = UnitOfPower.WATT
     _attr_device_class = SensorDeviceClass.POWER
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_suggested_display_precision = 1
+    _attr_suggested_display_precision = 0
 
     def __init__(self, coordinator):
         super().__init__(coordinator)
@@ -630,6 +635,10 @@ class ISDTMASS2TotalPowerSensor(CoordinatorEntity, SensorEntity):
     def native_value(self):
         if not self.coordinator.data:
             return None
+        device_total = self.coordinator.data.get("_total_power")
+        if device_total is not None:
+            return device_total
+        # Fallback for backwards compatibility / older parser data
         total = sum(
             ch_data.get("power", 0.0)
             for ch_data in self.coordinator.data.values()

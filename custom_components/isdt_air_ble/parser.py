@@ -371,6 +371,12 @@ def _parse_mass2_work_status(data: bytes, parsed: dict) -> bool:
         )
         return False
 
+    # Store the device-reported total power (byte 2). This matches what
+    # the manufacturer app shows ("15W TOTAL") instead of summing the
+    # per-port values, which can drift slightly from the device's own
+    # internal accounting and includes phantom-pulse noise.
+    parsed["_total_power"] = data[2]
+
     pos = 3
     for port in range(MASS2_PORT_COUNT):
         if port not in parsed:
@@ -464,4 +470,39 @@ def build_mass2_settings_set_req(settings: dict) -> bytearray:
     # Pad with default alarms if fewer than 4 were provided
     while len(cmd) < 21:
         cmd.append(0)
+    return cmd
+
+
+def build_mass2_set_time_req(now, tz_offset_hours: int, is_24h: bool = True) -> bytearray:
+    """Build SetTimeReq packet (CMD 0x12 0xCE) for the MASS2 RTC.
+
+    Mirrors MASS2Fragment.isConnected(true) in the manufacturer app, which
+    pushes the current wall-clock time on every successful connect. The
+    payload (after the 0x12 0xCE header) is::
+
+        byte 0     : is_24h (0/1)
+        byte 1     : hour (0-23)
+        byte 2     : minute (0-59)
+        byte 3     : second (0-59)
+        bytes 4-5  : millisecond (uint16 LE)
+        byte 6     : year - 2000
+        byte 7     : month (1-12)
+        byte 8     : day (1-31)
+        byte 9     : ISO weekday (Mon=1 .. Sun=7)
+        byte 10    : timezone offset hours (signed int8)
+
+    `now` is expected to be a tz-aware ``datetime`` in the local zone the
+    user wants displayed on the device.
+    """
+    cmd = bytearray([0x12, 0xCE])
+    cmd.append(1 if is_24h else 0)
+    cmd.append(now.hour & 0xFF)
+    cmd.append(now.minute & 0xFF)
+    cmd.append(now.second & 0xFF)
+    cmd += (now.microsecond // 1000).to_bytes(2, "little")
+    cmd.append((now.year - 2000) & 0xFF)
+    cmd.append(now.month & 0xFF)
+    cmd.append(now.day & 0xFF)
+    cmd.append(now.isoweekday() & 0xFF)
+    cmd.append(tz_offset_hours & 0xFF)  # signed int8 → wrap to byte
     return cmd

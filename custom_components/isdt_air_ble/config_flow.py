@@ -21,16 +21,24 @@ from .const import (
     BIND_RESULT_WAITING,
     BIND_STATUS,
     CONF_BIND_UUID,
+    CONF_PHANTOM_DEBOUNCE,
+    CONF_PHANTOM_SUSTAIN,
+    CONF_PHANTOM_THRESHOLD,
     CONF_SCAN_INTERVAL,
     CHAR_UUID_AF01,
     CHAR_UUID_AF02,
     CMD_BIND_REQ,
     CMD_HARDWARE_INFO_REQ,
+    DEFAULT_PHANTOM_DEBOUNCE,
+    DEFAULT_PHANTOM_SUSTAIN,
+    DEFAULT_PHANTOM_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
     DEVICE_MODEL_MAP,
     DOMAIN,
+    DeviceType,
     ISDT_MANUFACTURER_ID,
     RESP_BIND,
+    get_device_type,
 )
 from .parser import parse_hardware_info
 
@@ -65,19 +73,46 @@ class ISDTOptionsFlow(OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(data=user_input)
 
-        current_interval = self.config_entry.options.get(
-            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-        )
+        options = self.config_entry.options
+        model = self.config_entry.data.get("model", "")
+        is_adapter = get_device_type(model) == DeviceType.ADAPTER
 
-        schema = vol.Schema(
-            {
-                vol.Required(CONF_SCAN_INTERVAL, default=current_interval): vol.All(
-                    vol.Coerce(int), vol.Range(min=3, max=300)
-                ),
-            }
-        )
+        schema_dict: dict[Any, Any] = {
+            vol.Required(
+                CONF_SCAN_INTERVAL,
+                default=options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+            ): vol.All(vol.Coerce(int), vol.Range(min=3, max=300)),
+        }
 
-        return self.async_show_form(step_id="init", data_schema=schema)
+        # Phantom-load filter only makes sense for adapters (MASS2 etc.),
+        # where charging pads pulse periodically in standby.
+        if is_adapter:
+            schema_dict[
+                vol.Required(
+                    CONF_PHANTOM_THRESHOLD,
+                    default=options.get(
+                        CONF_PHANTOM_THRESHOLD, DEFAULT_PHANTOM_THRESHOLD
+                    ),
+                )
+            ] = vol.All(vol.Coerce(float), vol.Range(min=0.0, max=20.0))
+            schema_dict[
+                vol.Required(
+                    CONF_PHANTOM_DEBOUNCE,
+                    default=options.get(
+                        CONF_PHANTOM_DEBOUNCE, DEFAULT_PHANTOM_DEBOUNCE
+                    ),
+                )
+            ] = vol.All(vol.Coerce(float), vol.Range(min=0.0, max=30.0))
+            schema_dict[
+                vol.Required(
+                    CONF_PHANTOM_SUSTAIN,
+                    default=options.get(
+                        CONF_PHANTOM_SUSTAIN, DEFAULT_PHANTOM_SUSTAIN
+                    ),
+                )
+            ] = vol.All(vol.Coerce(float), vol.Range(min=0.0, max=120.0))
+
+        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema_dict))
 
 
 class ISDTConfigFlow(ConfigFlow, domain=DOMAIN):

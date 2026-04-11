@@ -33,10 +33,16 @@
       "init": {
         "title": "ISDT Device Options",
         "data": {
-          "scan_interval": "Poll interval (seconds)"
+          "scan_interval": "Poll interval (seconds)",
+          "phantom_threshold": "Phantom-load threshold (W)",
+          "phantom_debounce": "Phantom-load debounce (seconds)",
+          "phantom_sustain": "Sustained low-power window (seconds)"
         },
         "data_description": {
-          "scan_interval": "How often the device is queried via Bluetooth (3–300 seconds)."
+          "scan_interval": "How often the device is queried via Bluetooth (3–300 seconds).",
+          "phantom_threshold": "Adapter only. Above this a port is instantly reported as active (real charging). Below it the sustained-window logic kicks in. Set to 0 to disable phantom filtering entirely.",
+          "phantom_debounce": "Adapter only. How long power must stay below the low threshold before an active port drops back to off. Bridges brief PD re-negotiation dips.",
+          "phantom_sustain": "Adapter only. Slow chargers (e.g. electric toothbrushes at ~0.5 W) must stay continuously above the low threshold for this long before being reported as active. Samsung-style pad pulses (2–3 s) never reach this window, so they stay filtered."
         }
       }
     }

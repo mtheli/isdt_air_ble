@@ -13,6 +13,20 @@ class DeviceType(StrEnum):
 CONF_SCAN_INTERVAL = "scan_interval"
 DEFAULT_SCAN_INTERVAL = 5  # seconds
 
+# Adapter phantom-load filter (MASS2 etc.)
+# Charging pads in standby periodically pulse small amounts of power
+# (Apple pads ~0.2 W, Samsung pads up to ~0.6 W) to probe for devices.
+# These pulses flip the port_status sensor and pollute the recorder.
+# The filter zeroes out a port's data when power stays below the
+# threshold, and requires it to stay above the threshold for at least
+# the debounce window before reporting it as active.
+CONF_PHANTOM_THRESHOLD = "phantom_threshold"   # watts — instant-active
+CONF_PHANTOM_DEBOUNCE = "phantom_debounce"     # seconds — down-hysteresis
+CONF_PHANTOM_SUSTAIN = "phantom_sustain"       # seconds — sustained low-power
+DEFAULT_PHANTOM_THRESHOLD = 1.0
+DEFAULT_PHANTOM_DEBOUNCE = 2.5
+DEFAULT_PHANTOM_SUSTAIN = 5.0
+
 # BLE GATT characteristic UUIDs
 CHAR_UUID_AF01 = "0000af01-0000-1000-8000-00805f9b34fb"  # Notify/Write (normal polling)
 CHAR_UUID_AF02 = "0000af02-0000-1000-8000-00805f9b34fb"  # Write (hardware info)
@@ -154,6 +168,13 @@ CMD_MASS2_SETTINGS_REQ = bytearray([0x12, 0xCA])
 # (full 21-byte frame: scheduledMute, volume, operationSoundRepeatDay,
 #  openingTime[2], closingTime[2], 4 × (switchRepeatDay, openingTime[2]))
 CMD_MASS2_SETTINGS_SET = bytearray([0x12, 0xC8])
+
+# SetTimeReq: push current wall-clock time + tz offset to the device RTC.
+# The manufacturer app sends this on every successful connect; without
+# it, the device clock stays on whatever it booted with (typically
+# 2000-01-01) and per-port schedules / alarm clocks would not fire at
+# the right time. Payload follows MASS2Fragment.isConnected(true).
+CMD_MASS2_SET_TIME = bytearray([0x12, 0xCE])
 
 # MASS2 response command bytes
 RESP_MASS2_WORK_STATUS = 0xC3   # WorkStatusResp (8 ports × 7 bytes)

@@ -6,7 +6,18 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, CONF_SCAN_INTERVAL, CONF_BIND_UUID, DEFAULT_SCAN_INTERVAL
+from .const import (
+    CONF_BIND_UUID,
+    CONF_PHANTOM_DEBOUNCE,
+    CONF_PHANTOM_SUSTAIN,
+    CONF_PHANTOM_THRESHOLD,
+    CONF_SCAN_INTERVAL,
+    DEFAULT_PHANTOM_DEBOUNCE,
+    DEFAULT_PHANTOM_SUSTAIN,
+    DEFAULT_PHANTOM_THRESHOLD,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+)
 from .coordinator import ISDTDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -19,6 +30,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     address = entry.data["address"]
     model = entry.data.get("model", "C4 Air")
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    phantom_threshold = entry.options.get(
+        CONF_PHANTOM_THRESHOLD, DEFAULT_PHANTOM_THRESHOLD
+    )
+    phantom_debounce = entry.options.get(
+        CONF_PHANTOM_DEBOUNCE, DEFAULT_PHANTOM_DEBOUNCE
+    )
+    phantom_sustain = entry.options.get(
+        CONF_PHANTOM_SUSTAIN, DEFAULT_PHANTOM_SUSTAIN
+    )
 
     # Persistent bind UUID — generate once and store in entry data so the
     # device recognizes us across HA restarts. Matches manufacturer app behavior.
@@ -34,7 +54,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
 
     coordinator = ISDTDataUpdateCoordinator(
-        hass, address, model, scan_interval, bind_uuid=bind_uuid,
+        hass,
+        address,
+        model,
+        scan_interval,
+        bind_uuid=bind_uuid,
+        phantom_threshold=phantom_threshold,
+        phantom_debounce=phantom_debounce,
+        phantom_sustain=phantom_sustain,
     )
 
     hass.data.setdefault(DOMAIN, {})
