@@ -140,7 +140,7 @@ MODEL_DEVICE_TYPE_MAP: dict[str, DeviceType] = {
 
 # Map model names to channel/slot counts
 MODEL_CHANNEL_COUNT_MAP: dict[str, int] = {
-    "A8 Air": 9,  # Channels 0-8 (despite the "8" in the name)
+    "A8 Air": 8,  # Channels 0-7
     "A4 Air": 4,
     # Default for most chargers is 6 channels
 }

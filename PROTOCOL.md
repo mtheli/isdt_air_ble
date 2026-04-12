@@ -45,7 +45,7 @@ Connect
         ├── Write command
         ├── Wait 100ms
         ├── Write next command
-        ├── ... (19 commands per cycle for 6-channel devices, 28 for 9-channel devices)
+        ├── ... (19 commands per cycle for 6-channel devices, 25 for 8-channel devices)
         └── Collect & parse notification responses
 ```
 
@@ -130,7 +130,7 @@ Commands are sent one at a time with a 100ms interval.
 
 One full cycle consists of 1 + (N × 3) commands, where N is the number of channels:
 - 6-channel devices (C4 Air, etc.): 19 commands total
-- 9-channel devices (A8 Air): 28 commands total
+- 8-channel devices (A8 Air): 25 commands total
 
 | # | Command | Channel | Description |
 |---|---------|---------|-------------|
@@ -143,11 +143,10 @@ One full cycle consists of 1 + (N × 3) commands, where N is the number of chann
 | 17–19 | WorkState, Electric, IR | 5 | Slot 6 data |
 | 20–22 | WorkState, Electric, IR | 6 | Slot 7 data (A8 Air only) |
 | 23–25 | WorkState, Electric, IR | 7 | Slot 8 data (A8 Air only) |
-| 26–28 | WorkState, Electric, IR | 8 | Slot 9 data (A8 Air only) |
 
 At 100ms per command, one full cycle takes approximately:
 - 6-channel: 1.9 seconds
-- 9-channel: 2.8 seconds
+- 8-channel: 2.5 seconds
 
 ### AlarmToneReq (0x12 0x92)
 
@@ -318,7 +317,7 @@ The device model is identified from bytes 2–5 of the manufacturer data payload
 
 ## A8 Air Protocol Differences
 
-The A8 Air (9-channel charger) uses an enhanced protocol with the following differences
+The A8 Air (8-channel charger) uses an enhanced protocol with the following differences
 from other ISDT chargers. The `0x31` frame header is identical to all other models (see
 Response Frame Format above) — it is **not** A8-Air-specific.
 
@@ -332,8 +331,8 @@ Format: [0x31, 0xE7, total_channels, channel_data × 8]
 Total: 3 header bytes + 200 data bytes (8 × 25 bytes per channel)
 ```
 
-**Channel mapping:** Data is provided for channels 0,1,2,3,4,6,7,8 (channel 5 is unused).
 Byte 2 contains `total_channels` (= 8), not a single channel ID as in the C4 Air format.
+Channels are sequential 0–7.
 
 **Per-channel format (25 bytes, from `A8WorkStateResp.java`):**
 
@@ -369,9 +368,8 @@ Offset  Length  Field           Unit
 5       4       Input current   mA (LE) → ÷1000 = A
 ```
 
-**Channel 8** serves dual purpose:
-- Charging slot data (8th battery slot)
-- Device input voltage/current (power supply monitoring)
+The app only sends one `ElectricReq` for channel 0 (default). The device-level
+input voltage/current is the same on all channels, as on the C4 Air.
 
 ### Feature Differences
 
@@ -389,7 +387,7 @@ Offset  Length  Field           Unit
 | Post-notification setup | 0.5s | Wait after enabling AF01 notifications |
 | Command interval | 100ms | Delay between individual polling commands |
 | Full cycle (6-channel) | ~1.9s | 19 commands × 100ms (C4 Air) |
-| Full cycle (9-channel) | ~2.8s | 28 commands × 100ms (A8 Air) |
+| Full cycle (8-channel) | ~2.5s | 25 commands × 100ms (A8 Air) |
 | Bind timeout | 3.0s | Max wait for BindResp on AF02 |
 | Hardware info timeout | 3.0s | Max wait for HardwareInfoResp on AF02 |
 

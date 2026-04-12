@@ -61,16 +61,10 @@ def _parse_a8_air_workstate_mega(data: bytes) -> list[bytearray] | None:
 
     _LOGGER.log(TRACE, "A8 Air mega-packet (%d bytes, %d channels)", len(data), total_channels)
 
-    # Channel mapping: channels 0-4, then skip 5, then 6-8
-    channel_map = [0, 1, 2, 3, 4, 6, 7, 8]
-
     responses = []
     pos = header_size
 
-    for i in range(total_channels):
-        if i >= len(channel_map):
-            break
-        ch = channel_map[i]
+    for ch in range(total_channels):
         cd = data[pos:pos + bytes_per_channel]
 
         # Map to C4 Air standard 42-byte WorkState format so parse_workstate
