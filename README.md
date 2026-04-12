@@ -22,9 +22,9 @@ A matching dashboard card is available: **[ISDT Charger Card](https://github.com
 
 | Model | Type | Status |
 |-------|------|--------|
-| ISDT C4 Air | 6-Channel Charger | Tested ✓ |
+| ISDT C4 Air | 6-Channel Charger | Tested ✓ ([@mtheli](https://github.com/mtheli)) |
 | ISDT A8 Air | 9-Channel Charger | Tested ✓ ([@stuartp44](https://github.com/stuartp44)) |
-| ISDT MASS2 | USB Adapter | Tested ✓ |
+| ISDT MASS2 | USB Adapter | Tested ✓ ([@mtheli](https://github.com/mtheli)) |
 | ISDT NP2 Air | Charger | Untested |
 | ISDT LP2 Air | Charger | Untested |
 | ISDT K4 | Charger | Untested |
