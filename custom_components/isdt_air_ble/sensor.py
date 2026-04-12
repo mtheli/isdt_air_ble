@@ -45,26 +45,44 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 def _setup_charger_sensors(coordinator, entities):
     """Set up sensors for charger devices (C4 Air etc.)."""
+    # A8 Air: device input stats are on channel 8, other models use channel 0
+    is_a8_air = "A8" in coordinator.model.upper()
+    input_channel = 8 if is_a8_air else 0
+    
     entities.extend(
         [
             ISDTC4VoltageSensor(
                 coordinator,
                 "input_voltage",
                 "input_voltage",
-                channel=0,
+                channel=input_channel,
             ),
             ISDTC4CurrentSensor(
                 coordinator,
                 "input_current",
                 "input_current",
-                channel=0,
+                channel=input_channel,
             ),
             ISDTC4TotalChargingSensor(coordinator),
         ]
     )
 
-    for ch in range(6):
-        slot = ch + 1
+    # A8 Air slot counter for sequential numbering (1-8 instead of 1-5,7-9)
+    slot_number = 0
+    
+    for ch in range(coordinator.channel_count):
+        # A8 Air: Channel 5 is not used, skip creating sensors for it
+        if is_a8_air and ch == 5:
+            continue
+        
+        # Increment slot counter for each charging channel
+        slot_number += 1
+        slot = slot_number if is_a8_air else ch + 1
+        
+        # For A8 Air slots after 5, IR data comes from channel-1 due to device numbering
+        # Slot 6 reads IR from channel 5, Slot 7 from channel 6, Slot 8 from channel 7
+        # Note: Channel 8 is used for both charging slot 8 AND device input voltage/current
+        ir_channel = ch - 1 if (is_a8_air and ch > 5) else ch
 
         entities.extend(
             [
@@ -128,22 +146,24 @@ def _setup_charger_sensors(coordinator, entities):
                     coordinator,
                     "internal_resistance",
                     "ir_mohm",
-                    channel=ch,
+                    channel=ir_channel,
                     slot=slot,
                 ),
             ]
         )
 
-        for cell_idx in range(16):
-            entities.append(
-                ISDTC4CellVoltageSensor(
-                    coordinator,
-                    f"cell_{cell_idx + 1}",
-                    channel=ch,
-                    cell_index=cell_idx,
-                    slot=slot,
+        # A8 Air doesn't support individual cell voltage monitoring
+        if not is_a8_air:
+            for cell_idx in range(16):
+                entities.append(
+                    ISDTC4CellVoltageSensor(
+                        coordinator,
+                        f"cell_{cell_idx + 1}",
+                        channel=ch,
+                        cell_index=cell_idx,
+                        slot=slot,
+                    )
                 )
-            )
 
 
 def _setup_adapter_sensors(coordinator, entities):
@@ -192,11 +212,8 @@ class ISDTC4AirSensorBase(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if the device is currently in Bluetooth range."""
-        service_info = bluetooth.async_last_service_info(
-            self.hass, self.coordinator.address, connectable=True
-        )
-        return service_info is not None
+        """Return True if coordinator is successfully updating."""
+        return self.coordinator.last_update_success
 
     @property
     def native_value(self):
@@ -277,6 +294,28 @@ class ISDTC4BatterySensor(ISDTC4AirSensorBase):
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    def available(self) -> bool:
+        """Only show battery sensor when a battery is actually connected."""
+        if not self.coordinator.last_update_success:
+            return False
+        
+        if not self.coordinator.data or self._channel not in self.coordinator.data:
+            return False
+        
+        ch = self.coordinator.data[self._channel]
+        state = ch.get("work_state_str")
+        
+        # Battery is present if charging, done, or in error state
+        if state in ("charging", "done", "error"):
+            return True
+        
+        # For idle state, check if there's actually a battery present
+        output_v = ch.get("output_voltage", 0.0) or 0.0
+        capacity = ch.get("capacity_percentage", 0) or 0
+        
+        return output_v > 0.5 or capacity > 0
 
 
 class ISDTC4CapacitySensor(ISDTC4AirSensorBase):

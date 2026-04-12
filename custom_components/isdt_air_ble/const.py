@@ -116,6 +116,7 @@ DEVICE_MODEL_MAP = {
     "01060000": "K4",
     "01070000": "C4 Air",
     "01080000": "Power 200",
+    "010f00a8": "A8 Air",
     "01100000": "PB70W",
     "01100001": "PB70W",
     "01110000": "EDGE",
@@ -137,6 +138,13 @@ MODEL_DEVICE_TYPE_MAP: dict[str, DeviceType] = {
     "MASS2": DeviceType.ADAPTER,
 }
 
+# Map model names to channel/slot counts
+MODEL_CHANNEL_COUNT_MAP: dict[str, int] = {
+    "A8 Air": 9,  # Channels 0-8 (despite the "8" in the name)
+    "A4 Air": 4,
+    # Default for most chargers is 6 channels
+}
+
 MASS2_PORT_COUNT = 8
 
 # MASS2 physical port layout (from MASS2Base.java line 119)
@@ -150,6 +158,11 @@ MASS2_PORT_LABELS = [
 def get_device_type(model: str) -> DeviceType:
     """Get device type for a model name. Defaults to CHARGER."""
     return MODEL_DEVICE_TYPE_MAP.get(model, DeviceType.CHARGER)
+
+
+def get_channel_count(model: str) -> int:
+    """Get number of channels/slots for a charger model. Defaults to 6."""
+    return MODEL_CHANNEL_COUNT_MAP.get(model, 6)
 
 
 # ---------------------------------------------------------------------------

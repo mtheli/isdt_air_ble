@@ -59,6 +59,13 @@ def _detect_model(discovery_info: BluetoothServiceInfoBleak) -> str:
         model = DEVICE_MODEL_MAP.get(model_id)
         if model:
             return model
+        # Log unknown model IDs so we can add them to the map
+        _LOGGER.warning(
+            "Unknown ISDT model ID '%s' from device '%s'. "
+            "Please add this to DEVICE_MODEL_MAP in const.py",
+            model_id,
+            discovery_info.name,
+        )
 
     return "ISDT Device"
 
