@@ -191,3 +191,22 @@ MASS2_PROTOCOL_MAP = {
     1: "pd",
     2: "fast_charge",
 }
+
+# ---------------------------------------------------------------------------
+# Firmware update check (public ISDT OTA API, no auth required)
+# ---------------------------------------------------------------------------
+OTA_BLE_URL = "https://www.isdt.co/ota/newble.json"
+
+# Map our model names → deviceName in ISDT OTA JSON
+MODEL_OTA_NAME_MAP: dict[str, str] = {
+    "C4 Air": "C4Air",
+    "C4 EVO": "C4Air",
+    "A4 Air": "A4Air",
+    "A8 Air": "A8Air",
+    "NP2 Air": "NP2Air",
+    "LP2 Air": "LP2Air",
+    "MASS2": "MASS2",
+    "608PD": "608PD",
+    "EDGE": "EDGE",
+    "Power 200": "Power200",
+}

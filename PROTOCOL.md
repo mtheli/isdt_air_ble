@@ -1,7 +1,7 @@
 # ISDT Charger BLE Protocol
 
 Technical documentation of the BLE protocol used by ISDT chargers (C4 Air, NP2 Air, LP2 Air, etc.).
-Reverse-engineered from the ISDT Link Android app and verified against real device communication.
+Documented from BLE traffic analysis and verified against real device communication.
 
 ## Overview
 

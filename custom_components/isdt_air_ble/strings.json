@@ -171,6 +171,11 @@
           "high": "High"
         }
       }
+    },
+    "update": {
+      "firmware": {
+        "name": "Firmware"
+      }
     }
   }
 }
