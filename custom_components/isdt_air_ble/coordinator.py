@@ -287,9 +287,10 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                         continue
 
                     # Connecting to device
-                    backoff = _BACKOFF_MIN
                     async with self._connection_lock:
                         await self._connect(service_info.device)
+                    # Reset backoff only after successful connect
+                    backoff = _BACKOFF_MIN
                     cmd_index = 0
                     last_push_time = 0.0
 
@@ -331,7 +332,11 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("Live monitoring cancelled")
                 raise
             except Exception as err:
-                _LOGGER.warning("Live monitoring error: %s – reconnecting", err)
+                _LOGGER.warning(
+                    "Live monitoring error: %s – waiting %ds before reconnect",
+                    err,
+                    backoff,
+                )
                 await self._disconnect()
                 self._device_available.clear()
                 try:
@@ -615,6 +620,15 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception as err:
             _LOGGER.warning("Failed to connect: %s", err)
             self._connected = False
+            # Properly disconnect if establish_connection succeeded but a
+            # later step (MTU, notifications, bind) failed — dropping the
+            # reference without disconnect() leaks the BlueZ connection slot.
+            if self._client:
+                try:
+                    async with asyncio.timeout(5.0):
+                        await self._client.disconnect()
+                except Exception:
+                    pass
             self._client = None
             raise
 
@@ -791,20 +805,30 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 pass
 
     async def _disconnect(self):
-        """Disconnect from BLE device (with timeout to avoid hanging)."""
-        if self._client and self._client.is_connected:
-            try:
-                async with asyncio.timeout(5.0):
-                    if self._notification_started:
-                        await self._client.stop_notify(CHAR_UUID_AF01)
-                        self._notification_started = False
-                    await self._client.disconnect()
-                    _LOGGER.debug("Disconnected from %s", self.address)
-            except (TimeoutError, Exception) as err:
-                _LOGGER.debug("Error during disconnect: %s", err)
+        """Disconnect from BLE device (with timeout to avoid hanging).
 
+        Always attempts to disconnect even when is_connected reports False
+        — BlueZ may still hold the connection slot until disconnect() is
+        called on the client object.
+        """
+        client = self._client
         self._client = None
         self._connected = False
+        self._notification_started = False
+
+        if client is None:
+            return
+
+        try:
+            async with asyncio.timeout(5.0):
+                try:
+                    await client.stop_notify(CHAR_UUID_AF01)
+                except Exception:
+                    pass
+                await client.disconnect()
+                _LOGGER.debug("Disconnected from %s", self.address)
+        except (TimeoutError, Exception) as err:
+            _LOGGER.debug("Error during disconnect: %s", err)
 
     # ------------------------------------------------------------------
     # DataUpdateCoordinator override – passive when live connection active
