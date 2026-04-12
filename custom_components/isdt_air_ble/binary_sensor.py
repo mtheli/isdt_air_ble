@@ -27,19 +27,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
             port_num = port + 1
             entities.append(ISDTMASS2PortActiveSensor(coordinator, port_num, port))
     else:
-        is_a8_air = "A8" in coordinator.model.upper()
-        
-        # A8 Air slot counter for sequential numbering (1-8 instead of 1-5,7-9)
-        slot_number = 0
-        
         for ch in range(coordinator.channel_count):
-            # A8 Air: Channel 5 is not used - skip creating sensors
-            if is_a8_air and ch == 5:
-                continue
-            
-            # Increment slot counter for each charging channel
-            slot_number += 1
-            slot = slot_number if is_a8_air else ch + 1
+            slot = ch + 1
             entities.append(ISDTC4SlotActiveSensor(coordinator, slot, ch))
             entities.append(ISDTC4BatteryInsertedSensor(coordinator, slot, ch))
             entities.append(ISDTC4SlotErrorSensor(coordinator, slot, ch))

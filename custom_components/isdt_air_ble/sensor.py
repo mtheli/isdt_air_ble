@@ -44,45 +44,29 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 
 def _setup_charger_sensors(coordinator, entities):
-    """Set up sensors for charger devices (C4 Air etc.)."""
-    # A8 Air: device input stats are on channel 8, other models use channel 0
+    """Set up sensors for charger devices (C4 Air, A8 Air, etc.)."""
     is_a8_air = "A8" in coordinator.model.upper()
-    input_channel = 8 if is_a8_air else 0
-    
+
     entities.extend(
         [
             ISDTC4VoltageSensor(
                 coordinator,
                 "input_voltage",
                 "input_voltage",
-                channel=input_channel,
+                channel=0,
             ),
             ISDTC4CurrentSensor(
                 coordinator,
                 "input_current",
                 "input_current",
-                channel=input_channel,
+                channel=0,
             ),
             ISDTC4TotalChargingSensor(coordinator),
         ]
     )
 
-    # A8 Air slot counter for sequential numbering (1-8 instead of 1-5,7-9)
-    slot_number = 0
-    
     for ch in range(coordinator.channel_count):
-        # A8 Air: Channel 5 is not used, skip creating sensors for it
-        if is_a8_air and ch == 5:
-            continue
-        
-        # Increment slot counter for each charging channel
-        slot_number += 1
-        slot = slot_number if is_a8_air else ch + 1
-        
-        # For A8 Air slots after 5, IR data comes from channel-1 due to device numbering
-        # Slot 6 reads IR from channel 5, Slot 7 from channel 6, Slot 8 from channel 7
-        # Note: Channel 8 is used for both charging slot 8 AND device input voltage/current
-        ir_channel = ch - 1 if (is_a8_air and ch > 5) else ch
+        slot = ch + 1
 
         entities.extend(
             [
@@ -146,7 +130,7 @@ def _setup_charger_sensors(coordinator, entities):
                     coordinator,
                     "internal_resistance",
                     "ir_mohm",
-                    channel=ir_channel,
+                    channel=ch,
                     slot=slot,
                 ),
             ]
