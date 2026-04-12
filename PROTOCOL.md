@@ -1,6 +1,6 @@
 # ISDT Charger BLE Protocol
 
-Technical documentation of the BLE protocol used by ISDT chargers (C4 Air, NP2 Air, LP2 Air, etc.).
+Technical documentation of the BLE protocol used by ISDT chargers (C4 Air, A8 Air, NP2 Air, LP2 Air, etc.).
 Documented from BLE traffic analysis and verified against real device communication.
 
 ## Overview
@@ -45,7 +45,7 @@ Connect
         ├── Write command
         ├── Wait 100ms
         ├── Write next command
-        ├── ... (19 commands per cycle)
+        ├── ... (19 commands per cycle for 6-channel devices, 28 for 9-channel devices)
         └── Collect & parse notification responses
 ```
 
@@ -107,6 +107,20 @@ Offset  Length  Field
 5       8       Device ID (uint64, little-endian) → serial number
 ```
 
+## Response Frame Format
+
+All AF01 notification responses from ISDT chargers share a common frame structure:
+
+```
+Byte 0: 0x31  Frame header (all charger and adapter models)
+Byte 1: CMD   Command/response identifier
+Byte 2+:      Command-specific payload
+```
+
+The `0x31` frame header is used by all known ISDT BLE devices (C4 Air, A8 Air, NP2 Air,
+MASS2, etc.). It serves as a transport-layer framing byte. The parser does not need to
+evaluate byte 0 — it is constant across all devices.
+
 ## Polling Commands (AF01)
 
 All polling commands are written to AF01. Responses arrive as AF01 notifications.
@@ -114,7 +128,9 @@ Commands are sent one at a time with a 100ms interval.
 
 ### Command Cycle
 
-One full cycle consists of 19 commands:
+One full cycle consists of 1 + (N × 3) commands, where N is the number of channels:
+- 6-channel devices (C4 Air, etc.): 19 commands total
+- 9-channel devices (A8 Air): 28 commands total
 
 | # | Command | Channel | Description |
 |---|---------|---------|-------------|
@@ -125,8 +141,13 @@ One full cycle consists of 19 commands:
 | 11–13 | WorkState, Electric, IR | 3 | Slot 4 data |
 | 14–16 | WorkState, Electric, IR | 4 | Slot 5 data |
 | 17–19 | WorkState, Electric, IR | 5 | Slot 6 data |
+| 20–22 | WorkState, Electric, IR | 6 | Slot 7 data (A8 Air only) |
+| 23–25 | WorkState, Electric, IR | 7 | Slot 8 data (A8 Air only) |
+| 26–28 | WorkState, Electric, IR | 8 | Slot 9 data (A8 Air only) |
 
-At 100ms per command, one full cycle takes approximately 1.9 seconds.
+At 100ms per command, one full cycle takes approximately:
+- 6-channel: 1.9 seconds
+- 9-channel: 2.8 seconds
 
 ### AlarmToneReq (0x12 0x92)
 
@@ -134,7 +155,7 @@ Queries the current alarm tone status.
 
 ```
 Write:    [0x12, 0x92]
-Response: [addr, 0x93, state]
+Response: [0x31, 0x93, state]
 ```
 
 `state`: 0 = off, non-zero = on.
@@ -153,7 +174,7 @@ Queries voltages, currents, and cell voltages for a channel.
 
 ```
 Write:    [0x12, 0xE4, channel]
-Response: [addr, 0xE5, channel, ...]
+Response: [0x31, 0xE5, channel, ...]
 ```
 
 **ElectricResp (0xE5)** — two formats depending on response length:
@@ -163,7 +184,7 @@ Response: [addr, 0xE5, channel, ...]
 ```
 Offset  Length  Field               Unit
 ──────  ──────  ─────────────       ────
-0       1       Address byte
+0       1       Frame header: 0x31
 1       1       Command: 0xE5
 2       1       Channel (0–5)
 3       4       Input voltage       mV (LE) → ÷1000 = V
@@ -178,7 +199,7 @@ Offset  Length  Field               Unit
 ```
 Offset  Length  Field               Unit
 ──────  ──────  ─────────────       ────
-0       1       Address byte
+0       1       Frame header: 0x31
 1       1       Command: 0xE5
 2       1       Channel (0–5)
 3       2       Input voltage       mV (LE) → ÷1000 = V
@@ -194,7 +215,7 @@ Queries charge state, capacity, battery type, timing, and error info for a chann
 
 ```
 Write:    [0x13, 0xE6, channel]
-Response: [addr, 0xE7, channel, ...]
+Response: [0x31, 0xE7, channel, ...]
 ```
 
 **WorkStateResp (0xE7):**
@@ -202,7 +223,7 @@ Response: [addr, 0xE7, channel, ...]
 ```
 Offset  Length  Field                       Unit / Values
 ──────  ──────  ─────────────               ─────────────
-0       1       Address byte
+0       1       Frame header: 0x31
 1       1       Command: 0xE7
 2       1       Channel (0–5)
 3       1       Work state                  See table below
@@ -253,7 +274,7 @@ Queries internal resistance per cell for a channel.
 
 ```
 Write:    [0x13, 0xFA, channel]
-Response: [addr, 0xFB, channel, ...]
+Response: [0x31, 0xFB, channel, ...]
 ```
 
 **IRResp (0xFB):**
@@ -261,7 +282,7 @@ Response: [addr, 0xFB, channel, ...]
 ```
 Offset  Length  Field               Unit
 ──────  ──────  ─────────────       ────
-0       1       Address byte
+0       1       Frame header: 0x31
 1       1       Command: 0xFB
 2       1       Channel (0–5)
 3       N×2     IR per cell         0.1 mΩ (LE, 2 bytes each)
@@ -290,9 +311,75 @@ The device model is identified from bytes 2–5 of the manufacturer data payload
 | `01060000` | K4 |
 | `01070000` | C4 Air |
 | `01080000` | Power 200 |
+| `010f00a8` | A8 Air |
 | `01100000` | PB70W |
 | `01110000` | EDGE |
 | `01120000` | PB100W |
+
+## A8 Air Protocol Differences
+
+The A8 Air (9-channel charger) uses an enhanced protocol with the following differences
+from other ISDT chargers. The `0x31` frame header is identical to all other models (see
+Response Frame Format above) — it is **not** A8-Air-specific.
+
+### WorkState Mega-Packet
+
+Instead of individual per-channel WorkState responses, the A8 Air sends a single
+**203-byte mega-packet** (`A8WorkStateResp`) containing data for all 8 charging channels:
+
+```
+Format: [0x31, 0xE7, total_channels, channel_data × 8]
+Total: 3 header bytes + 200 data bytes (8 × 25 bytes per channel)
+```
+
+**Channel mapping:** Data is provided for channels 0,1,2,3,4,6,7,8 (channel 5 is unused).
+Byte 2 contains `total_channels` (= 8), not a single channel ID as in the C4 Air format.
+
+**Per-channel format (25 bytes, from `A8WorkStateResp.java`):**
+
+```
+Offset  Length  Field               Unit
+──────  ──────  ─────────────       ────
+0       1       Work state          See WorkState values
+1       1       Capacity %          0–100
+2       4       Capacity done       mAh (LE)
+6       4       Energy done         mWh (LE)
+10      4       Work period         ms (LE)
+14      1       Battery type        See Battery Type values
+15      4       Work current        mA (LE) → ÷1000 = A
+19      2       Battery voltage     mV (LE) → ÷1000 = V
+21      2       Internal resistance 0.1 mΩ (LE) → ÷10 = mΩ
+23      2       Error code          LE (0 = no error)
+```
+
+Note: The mega-packet includes IR and error code per channel, so separate IR queries
+may be redundant for the A8 Air (the device still responds to them).
+
+### Electric Responses
+
+The A8 Air sends **9-byte Electric responses** (versus longer responses on other models):
+
+```
+Offset  Length  Field           Unit
+──────  ──────  ───────────     ────
+0       1       Frame header: 0x31
+1       1       Command: 0xE5
+2       1       Channel
+3       2       Input voltage   mV (LE) → ÷1000 = V
+5       4       Input current   mA (LE) → ÷1000 = A
+```
+
+**Channel 8** serves dual purpose:
+- Charging slot data (8th battery slot)
+- Device input voltage/current (power supply monitoring)
+
+### Feature Differences
+
+| Feature | C4 Air | A8 Air |
+|---------|--------|--------|
+| Alarm tone | Yes | No |
+| Cell voltages | Up to 16 per slot | Not available |
+| IR per cell | Separate IRResp | Included in mega-packet |
 
 ## Timing
 
@@ -301,7 +388,8 @@ The device model is identified from bytes 2–5 of the manufacturer data payload
 | Post-connect settle | 1.0s | Wait after GATT connection before bind |
 | Post-notification setup | 0.5s | Wait after enabling AF01 notifications |
 | Command interval | 100ms | Delay between individual polling commands |
-| Full cycle | ~1.9s | 19 commands × 100ms |
+| Full cycle (6-channel) | ~1.9s | 19 commands × 100ms (C4 Air) |
+| Full cycle (9-channel) | ~2.8s | 28 commands × 100ms (A8 Air) |
 | Bind timeout | 3.0s | Max wait for BindResp on AF02 |
 | Hardware info timeout | 3.0s | Max wait for HardwareInfoResp on AF02 |
 
@@ -315,8 +403,8 @@ The device model is identified from bytes 2–5 of the manufacturer data payload
   supporting more cells (e.g. for multi-cell LiPo packs) use the long format with 4-byte
   voltage fields and 16 cell slots. Single-cell charger modes use the short format.
 
-- **HardwareInfoResp offset:** Some devices include an address prefix byte before the
-  command byte (0xE1), others don't. The parser checks both positions.
+- **HardwareInfoResp offset:** Some devices include the 0x31 frame header before the
+  command byte (0xE1), others send 0xE1 at position 0. The parser checks both positions.
 
 - **NiMH charging protection:** NiMH/Cd batteries use Delta-Peak detection (-△V) for
   charge termination. The charger monitors for a small voltage drop (configurable 3–12 mV)

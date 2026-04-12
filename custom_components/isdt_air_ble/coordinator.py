@@ -47,6 +47,7 @@ from .const import (
     RESP_BIND,
     RESP_MASS2_SETTINGS,
     RESP_MASS2_WORK_STATUS,
+    get_channel_count,
     get_device_type,
 )
 from .parser import (
@@ -86,14 +87,14 @@ _PHANTOM_LOW_POWER = 0.3  # watts
 _PHANTOM_DISCONNECT_FLOOR = 0.05  # watts
 
 
-def _build_charger_command_list() -> list[bytearray]:
+def _build_charger_command_list(num_channels: int = 6) -> list[bytearray]:
     """Build the circular command list for charger devices.
 
     Order: AlarmTone, then per channel: WorkState, Electric, IR
-    Total: 1 + 6*3 = 19 commands.
+    Total: 1 + num_channels*3 commands (19 for 6 channels, 25 for 8 channels).
     """
     commands = [CMD_ALARM_TONE_REQ]
-    for ch in range(6):
+    for ch in range(num_channels):
         commands.append(CMD_WORKSTATE_REQ + bytearray([ch]))
         commands.append(CMD_ELECTRIC_REQ + bytearray([ch]))
         commands.append(CMD_IR_REQ + bytearray([ch]))
@@ -131,6 +132,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         self.address = address
         self.model = model
         self.device_type = get_device_type(model)
+        self.channel_count = get_channel_count(model) if self.device_type == DeviceType.CHARGER else 0
         self.scan_interval_seconds = scan_interval
         self.phantom_threshold = phantom_threshold
         self.phantom_debounce = phantom_debounce
@@ -178,7 +180,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         if self.device_type == DeviceType.ADAPTER:
             self._commands = _build_adapter_command_list()
         else:
-            self._commands = _build_charger_command_list()
+            self._commands = _build_charger_command_list(self.channel_count)
 
         # Bind UUID — persistent per device. Must stay stable across restarts
         # so the device recognizes us and doesn't require re-pairing (which
@@ -377,7 +379,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             self._apply_phantom_filter(parsed_ports)
             parsed = parsed_ports
         else:
-            parsed, alarm_tone_on = parse_charger_responses(responses)
+            parsed, alarm_tone_on = parse_charger_responses(responses, self.channel_count, self.model)
             self._alarm_tone_on = alarm_tone_on
 
         # Fetch hardware info if not yet done

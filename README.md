@@ -6,6 +6,8 @@
 
 Custom Home Assistant integration for **ISDT chargers** and the **MASS2** USB power adapter with Bluetooth Low Energy (BLE) connectivity. Communicates directly with the device via a persistent BLE connection — no cloud, no app required.
 
+Supports the **C4 Air** (6-channel charger), **A8 Air** (9-channel charger), and **MASS2** (8-port USB adapter).
+
 ![Device Overview](images/device_overview.png)
 
 ## Lovelace Card
@@ -16,18 +18,19 @@ A matching dashboard card is available: **[ISDT Charger Card](https://github.com
 
 ## Supported Devices
 
-> **Note:** This integration has been tested with the **ISDT C4 Air** (charger) and the **ISDT MASS2** (USB power adapter). Other ISDT devices with BLE support may work but are untested.
+> **Note:** This integration has been tested with the **ISDT C4 Air**, **ISDT A8 Air** (chargers), and the **ISDT MASS2** (USB power adapter). Other ISDT devices with BLE support may work but are untested.
 
 | Model | Type | Status |
 |-------|------|--------|
-| ISDT C4 Air | Charger | Tested |
-| ISDT MASS2 | USB Adapter | Tested |
+| ISDT C4 Air | 6-Channel Charger | Tested ✓ |
+| ISDT A8 Air | 9-Channel Charger | Tested ✓ ([@stuartp44](https://github.com/stuartp44)) |
+| ISDT MASS2 | USB Adapter | Tested ✓ |
 | ISDT NP2 Air | Charger | Untested |
 | ISDT LP2 Air | Charger | Untested |
 | ISDT K4 | Charger | Untested |
 | ISDT 608PD | Charger | Untested |
 
-The integration auto-detects the device model from BLE manufacturer data and exposes the appropriate entities (6 slot sub-devices for chargers, 8 USB port sub-devices for the MASS2). Other ISDT devices using the same BLE protocol may also work — feedback and reports are welcome.
+The integration auto-detects the device model from BLE manufacturer data and exposes the appropriate entities (6 slot sub-devices for C4 Air, 9 slot sub-devices for A8 Air, 8 USB port sub-devices for MASS2). Other ISDT devices using the same BLE protocol may also work — feedback and reports are welcome.
 
 ## Features
 
@@ -39,7 +42,7 @@ The integration auto-detects the device model from BLE manufacturer data and exp
 - **Hardware info** — firmware version, hardware version, serial number in the device registry
 - **Configurable poll interval** (3–300 seconds) via options flow
 
-### Chargers (C4 Air etc.)
+### Chargers (C4 Air, A8 Air)
 
 **Main device:**
 
@@ -49,9 +52,9 @@ The integration auto-detects the device model from BLE manufacturer data and exp
 | Input Voltage | Voltage (V) | Power supply voltage |
 | Input Current | Current (A) | Total input current |
 | Total Charging Current | Current (A) | Sum of all slot currents |
-| Slot 1–6 Status | Enum | `empty`, `idle`, `charging`, `done`, `error` |
+| Slot 1–6/1–8 Status | Enum | `empty`, `idle`, `charging`, `done`, `error` (6 slots for C4 Air, 8 slots for A8 Air) |
 | Signal Strength | RSSI (dBm) | BLE signal strength (disabled by default) |
-| Beep | Switch | Toggle the charger alarm/beep tone |
+| Beep | Switch | Toggle the charger alarm/beep tone (C4 Air only) |
 
 **Per slot (sub-device):**
 
@@ -62,13 +65,13 @@ The integration auto-detects the device model from BLE manufacturer data and exp
 | Error | Binary (Problem) | Whether the slot has a charging error |
 | Output Voltage | Voltage (V) | Slot output voltage |
 | Charging Current | Current (A) | Slot charging current |
-| Capacity | Battery (%) | Current charge level |
+| Capacity | Battery (%) | Current charge level (hidden when no battery inserted) |
 | Capacity Charged | mAh | Charged capacity in current session |
 | Energy Charged | Energy (Wh) | Charged energy in current session |
 | Charging Since | Timestamp | Charge start time (live-updating) |
 | Battery Type | Text | Detected chemistry (LiPo, NiMH, LiFe, etc.) |
 | Internal Resistance | mOhm | Battery internal resistance |
-| Cell 1–16 Voltage | Voltage (V) | Individual cell voltages (disabled by default) |
+| Cell 1–16 Voltage | Voltage (V) | Individual cell voltages (C4 Air only, disabled by default) |
 
 ### MASS2 USB Adapter
 

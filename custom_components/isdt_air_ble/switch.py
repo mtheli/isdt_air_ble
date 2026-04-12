@@ -17,7 +17,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     entities = []
     if coordinator.device_type == DeviceType.CHARGER:
-        entities.append(ISDTC4AlarmToneSwitch(coordinator))
+        # A8 Air doesn't have alarm tone functionality
+        if "A8" not in coordinator.model.upper():
+            entities.append(ISDTC4AlarmToneSwitch(coordinator))
     elif coordinator.device_type == DeviceType.ADAPTER:
         entities.append(ISDTMASS2BeepSwitch(coordinator))
 

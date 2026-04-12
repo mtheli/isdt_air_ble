@@ -20,19 +20,122 @@ _LOGGER = logging.getLogger(__name__)
 TRACE = 5  # HA supports trace level below DEBUG (10)
 
 
-def parse_charger_responses(responses: list[bytes]) -> tuple[dict, bool | None]:
+def _parse_a8_air_workstate_mega(data: bytes) -> list[bytearray] | None:
+    """Parse A8 Air WorkState mega-packet (A8WorkStateResp) for all channels.
+
+    The A8 Air sends all channel data in a single 203-byte packet instead of
+    individual per-channel responses like the C4 Air.
+
+    Format: [0x31, 0xE7, total_channels, channel_data × 8]
+    203 bytes total: 3 header + 8 × 25 bytes per channel.
+
+    Per-channel format (25 bytes, from A8WorkStateResp.java):
+      Offset 0:     work_state (1)
+      Offset 1:     capacity_% (1)
+      Offset 2-5:   capacity_mAh (4 LE)
+      Offset 6-9:   energy_mWh (4 LE)
+      Offset 10-13: work_period_ms (4 LE)
+      Offset 14:    battery_type (1)
+      Offset 15-18: work_current_mA (4 LE)
+      Offset 19-20: voltage_mV (2 LE)
+      Offset 21-22: IR (2 LE, 0.1 mΩ)
+      Offset 23-24: error_code (2 LE)
+
+    Returns a list of 42-byte responses in C4 Air standard format, or None.
+    """
+    if len(data) < 28:  # header + at least 1 channel
+        _LOGGER.warning("A8 Air mega-packet too short: %d bytes", len(data))
+        return None
+
+    total_channels = data[2]
+    header_size = 3
+    bytes_per_channel = 25
+
+    expected = header_size + total_channels * bytes_per_channel
+    if len(data) < expected:
+        _LOGGER.warning(
+            "A8 Air mega-packet truncated: %d bytes (need %d for %d channels)",
+            len(data), expected, total_channels,
+        )
+        return None
+
+    _LOGGER.log(TRACE, "A8 Air mega-packet (%d bytes, %d channels)", len(data), total_channels)
+
+    # Channel mapping: channels 0-4, then skip 5, then 6-8
+    channel_map = [0, 1, 2, 3, 4, 6, 7, 8]
+
+    responses = []
+    pos = header_size
+
+    for i in range(total_channels):
+        if i >= len(channel_map):
+            break
+        ch = channel_map[i]
+        cd = data[pos:pos + bytes_per_channel]
+
+        # Map to C4 Air standard 42-byte WorkState format so parse_workstate
+        # can handle both identically.
+        r = bytearray(42)
+        r[0] = 0x31                             # frame header
+        r[1] = RESP_WORKSTATE                   # cmd
+        r[2] = ch                               # channel
+        r[3] = cd[0]                            # work_state
+        r[4] = cd[1]                            # capacity_%
+        r[5:9] = cd[2:6]                        # capacity_mAh (4 LE)
+        r[9:13] = cd[6:10]                      # energy_mWh (4 LE)
+        r[13:17] = cd[10:14]                    # work_period_ms (4 LE)
+        r[17] = cd[14]                          # battery_type
+        r[18] = 0                               # unit_serials (not in A8)
+        r[19] = 0                               # link_type (not in A8)
+        r[20:22] = cd[19:21]                    # voltage_mV (2 LE)
+        r[22:26] = cd[15:19]                    # work_current_mA (4 LE)
+        # r[26:38] stays zero (fields not in A8 mega-packet)
+        r[36:38] = cd[23:25]                    # error_code (2 LE)
+
+        responses.append(r)
+        pos += bytes_per_channel
+
+    _LOGGER.debug("A8 Air mega-packet: extracted %d channel responses", len(responses))
+    return responses if responses else None
+
+
+
+def parse_charger_responses(responses: list[bytes], num_channels: int = 6, model: str = "C4 Air") -> tuple[dict, bool | None]:
     """Parse all BLE notification responses and assign to channels.
+
+    All responses share the common frame format [0x31, CMD, ...].
+    The A8 Air sends a single mega-packet for WorkState instead of per-channel
+    responses; this is expanded before the normal per-response loop.
+
+    Args:
+        responses: List of raw BLE notification bytes.
+        num_channels: Number of channels (6 for C4 Air, 9 for A8 Air).
+        model: Device model name.
 
     Returns:
         (parsed, alarm_tone_on)
         parsed:        dict {channel (int): {key: value, ...}}
         alarm_tone_on: bool | None
     """
-    parsed = {ch: {} for ch in range(6)}
+    is_a8_air = "A8" in model.upper()
+    parsed = {ch: {} for ch in range(num_channels)}
     alarm_tone_on = None
 
+    # Pre-process: expand A8 Air mega-packets into per-channel responses
+    expanded = []
     for raw in responses:
-        _LOGGER.log(TRACE, "RAW DATA from C4 Air: %s", raw.hex(" "))
+        if len(raw) < 3:
+            continue
+        # A8 Air mega-packet: CMD=WorkState and much larger than a single response
+        if is_a8_air and raw[1] == RESP_WORKSTATE and len(raw) > 100:
+            a8_parsed = _parse_a8_air_workstate_mega(raw)
+            if a8_parsed:
+                expanded.extend(a8_parsed)
+                continue
+        expanded.append(raw)
+
+    for raw in expanded:
+        _LOGGER.log(TRACE, "RAW DATA (%d bytes): %s", len(raw), raw.hex(" "))
 
         if len(raw) < 3:
             continue
@@ -47,7 +150,10 @@ def parse_charger_responses(responses: list[bytes]) -> tuple[dict, bool | None]:
 
         ch = raw[2]
         if ch not in parsed:
-            _LOGGER.warning("Unexpected channel %d in response", ch)
+            _LOGGER.warning(
+                "Unexpected channel %d in response (expected 0-%d for %s)",
+                ch, num_channels - 1, model,
+            )
             continue
 
         if cmd == RESP_ELECTRIC:
@@ -68,7 +174,7 @@ def parse_charger_responses(responses: list[bytes]) -> tuple[dict, bool | None]:
 def parse_electric(data: bytes) -> dict:
     """Parse ElectricResp (CMD RESP_ELECTRIC): voltages, currents, cell voltages.
 
-    Format: [addr, RESP_ELECTRIC, channel,
+    Format: [0x31, RESP_ELECTRIC, channel,
               input_v (2 or 4 bytes LE),
               input_a (4 bytes LE),
               output_v (2 or 4 bytes LE),
@@ -78,6 +184,27 @@ def parse_electric(data: bytes) -> dict:
     Short format:            2-byte voltages, 8 cells.
     All values in mV / mA → divided by 1000 to get V / A.
     """
+    # A8 Air sends 9-byte ElectricResp — input voltage and current only.
+    # Format: [0x31, 0xE5, channel, input_v(2B LE), input_a(4B LE)]
+    if len(data) == 9:
+        channel_id = data[2]
+        input_v = int.from_bytes(data[3:5], "little") / 1000.0
+        input_a = int.from_bytes(data[5:9], "little") / 1000.0
+        
+        _LOGGER.debug(
+            "Parse ElectricResp for channel %d: 9-byte format, In=%.2fV/%.3fA",
+            channel_id, input_v, input_a
+        )
+        
+        return {
+            "channel_id": channel_id,
+            "input_voltage": input_v,
+            "input_current": input_a,
+            # No output_voltage / charging_current in 9-byte format —
+            # those come from the WorkState mega-packet for A8 Air.
+            "cell_voltages": [],
+        }
+    
     if len(data) < 15:
         _LOGGER.warning("ElectricResp too short: %d bytes", len(data))
         return {}
@@ -140,7 +267,7 @@ def parse_electric(data: bytes) -> dict:
 def parse_workstate(data: bytes) -> dict:
     """Parse ChargerWorkStateResp (CMD RESP_WORKSTATE): charge state, capacity, time, etc.
 
-    Format: [addr, RESP_WORKSTATE, channel,
+    Format: [0x31, RESP_WORKSTATE, channel,
               work_state (1), capacity_% (1),
               capacity_mAh (4 LE), energy_mWh (4 LE), period_ms (4 LE),
               battery_type (1), unit_serials (1), link_type (1),
@@ -148,6 +275,9 @@ def parse_workstate(data: bytes) -> dict:
               bat_num_whole (2 LE), bat_num_current (2 LE),
               min_input_mV (2 LE), max_power_mW (4 LE),
               error_code (2 LE), [parallel_state (1)]]
+
+    A8 Air mega-packet data is pre-converted to this format by
+    _parse_a8_air_workstate_mega() before reaching this function.
     """
     if len(data) < 38:
         _LOGGER.warning("WorkStateResp too short: %d bytes", len(data))
@@ -209,13 +339,19 @@ def parse_workstate(data: bytes) -> dict:
         "max_output_power":              max_output_power,
         "error_code":                    error_code,
         "parallel_state":                parallel_state,
+        # Aliases: sensors read these keys from ElectricResp on C4 Air,
+        # but on A8 Air the 9-byte ElectricResp only has input V/I.
+        # WorkState provides the per-slot values instead. For C4 Air
+        # these are harmlessly overwritten by the subsequent ElectricResp.
+        "output_voltage":                full_charged_volt,
+        "charging_current":              work_current,
     }
 
 
 def parse_ir(data: bytes) -> dict:
     """Parse IRResp (CMD RESP_IR): internal resistance per cell.
 
-    Format: [addr, RESP_IR, channel, ir0_lo, ir0_hi, ir1_lo, ir1_hi, ...]
+    Format: [0x31, RESP_IR, channel, ir0_lo, ir0_hi, ir1_lo, ir1_hi, ...]
     Values are little-endian uint16, unit = 0.1 mΩ.
     Number of cells derived from response length:
       ≥20 bytes → 16 cells, >15 → 8, =15 → 6, else (len-3)//2.
@@ -249,10 +385,16 @@ def parse_ir(data: bytes) -> dict:
     ir_mohm = None
     if ir_values and 0 < ir_values[0] < 10000:
         ir_mohm = ir_values[0] / 10.0
+    elif ir_values:
+        # Log why IR is being rejected (especially for channel 8 debugging)
+        _LOGGER.debug(
+            "Channel %d: IR value %d rejected (must be >0 and <10000)",
+            channel_id, ir_values[0]
+        )
 
     _LOGGER.debug(
-        "Channel %d: IR values=%s, primary=%.1f mOhm",
-        channel_id, ir_values[:4], ir_mohm if ir_mohm is not None else 0.0,
+        "Channel %d: IR raw data (%d bytes): %s, values=%s, primary=%.1f mOhm",
+        channel_id, len(data), data.hex(" "), ir_values[:4], ir_mohm if ir_mohm is not None else 0.0,
     )
 
     return {
@@ -264,7 +406,7 @@ def parse_ir(data: bytes) -> dict:
 def parse_hardware_info(data: bytes) -> tuple[str, str, str] | None:
     """Parse HardwareInfoResp (CMD RESP_HARDWARE_INFO) received on characteristic AF02.
 
-    The CMD byte may be at position 0 (no address prefix) or 1 (with prefix).
+    The CMD byte may be at position 0 (no 0x31 frame header) or 1 (with 0x31 prefix).
     Layout after CMD: hw_main (1), hw_sub (1), sw_main (1), sw_sub (1), device_id (8 LE).
 
     Returns:
@@ -320,7 +462,7 @@ def parse_mass2_responses(responses: list[bytes]) -> tuple[dict | None, dict | N
     settings: dict | None = None
 
     for raw in responses:
-        _LOGGER.log(TRACE, "RAW DATA from MASS2 (%d bytes): %s", len(raw), raw.hex(" "))
+        _LOGGER.debug("RAW BLE DATA from MASS2 (%d bytes): %s", len(raw), raw.hex(" "))
 
         if len(raw) < 3:
             continue
