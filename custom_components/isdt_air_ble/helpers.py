@@ -34,7 +34,7 @@ def port_device_info(address: str, port: int, model: str = "MASS2") -> DeviceInf
     """Device info for a USB port sub-device.
 
     Uses the physical USB port label (USB-C1...USB-A2) when available,
-    matching how the manufacturer app labels the ports.
+    matching the port labelling on the device hardware.
     """
     if 1 <= port <= len(MASS2_PORT_LABELS):
         label = MASS2_PORT_LABELS[port - 1]

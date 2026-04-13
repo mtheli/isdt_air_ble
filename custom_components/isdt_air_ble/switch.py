@@ -107,8 +107,7 @@ class ISDTMASS2BeepSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs):
         try:
-            # Use value 1 (Summer) — same as the manufacturer app's
-            # default beep button.
+            # Use value 1 (Summer) — the default beep mode.
             await self.coordinator.async_set_mass2_beep(1)
             self.async_write_ha_state()
         except Exception as err:

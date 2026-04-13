@@ -206,7 +206,7 @@ class ISDTMASS2PortActiveSensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def is_on(self):
         # The device reports status=1 when actively delivering power.
-        # Matches the manufacturer app behavior (no threshold logic).
+        # No threshold logic — rely purely on the device-reported status byte.
         if self.coordinator.data and self._channel in self.coordinator.data:
             return self.coordinator.data[self._channel].get("status") == 1
         return False

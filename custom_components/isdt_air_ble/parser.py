@@ -17,7 +17,8 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-TRACE = 5  # HA supports trace level below DEBUG (10)
+_RAW_LOGGER = logging.getLogger(__name__ + ".raw")
+_RAW_LOGGER.setLevel(logging.WARNING)  # silent unless explicitly enabled
 
 
 def _parse_a8_air_workstate_mega(data: bytes) -> list[bytearray] | None:
@@ -59,7 +60,7 @@ def _parse_a8_air_workstate_mega(data: bytes) -> list[bytearray] | None:
         )
         return None
 
-    _LOGGER.log(TRACE, "A8 Air mega-packet (%d bytes, %d channels)", len(data), total_channels)
+    _RAW_LOGGER.debug("A8 Air mega-packet (%d bytes, %d channels)", len(data), total_channels)
 
     responses = []
     pos = header_size
@@ -103,7 +104,7 @@ def parse_charger_responses(responses: list[bytes], num_channels: int = 6, model
 
     Args:
         responses: List of raw BLE notification bytes.
-        num_channels: Number of channels (6 for C4 Air, 9 for A8 Air).
+        num_channels: Number of channels (6 for C4 Air, 8 for A8 Air).
         model: Device model name.
 
     Returns:
@@ -129,7 +130,7 @@ def parse_charger_responses(responses: list[bytes], num_channels: int = 6, model
         expanded.append(raw)
 
     for raw in expanded:
-        _LOGGER.log(TRACE, "RAW DATA (%d bytes): %s", len(raw), raw.hex(" "))
+        _RAW_LOGGER.debug("RAW DATA (%d bytes): %s", len(raw), raw.hex(" "))
 
         if len(raw) < 3:
             continue
@@ -144,11 +145,22 @@ def parse_charger_responses(responses: list[bytes], num_channels: int = 6, model
 
         ch = raw[2]
         if ch not in parsed:
-            _LOGGER.warning(
-                "Unexpected channel %d in response (expected 0-%d for %s)",
-                ch, num_channels - 1, model,
-            )
-            continue
+            # A8 Air firmware sends ElectricResp with a hardcoded channel
+            # value >= num_channels (device-level data, not per-slot).
+            # A8 Air ElectricResp channelId is not meaningful (device-level data).
+            # Remap to channel 0 so device-level sensors can read it.
+            if is_a8_air and cmd == RESP_ELECTRIC:
+                _LOGGER.debug(
+                    "Remapping A8 Air ElectricResp channel %d → 0 (device-level)",
+                    ch,
+                )
+                ch = 0
+            else:
+                _LOGGER.warning(
+                    "Unexpected channel %d in response (expected 0-%d for %s)",
+                    ch, num_channels - 1, model,
+                )
+                continue
 
         if cmd == RESP_ELECTRIC:
             parsed[ch].update(parse_electric(raw))
@@ -161,7 +173,7 @@ def parse_charger_responses(responses: list[bytes], num_channels: int = 6, model
                 "Unknown CMD 0x%02x for channel %d: %s", cmd, ch, raw.hex(" ")
             )
 
-    _LOGGER.log(TRACE, "Parsed data: %s", parsed)
+    _RAW_LOGGER.debug("Parsed data: %s", parsed)
     return parsed, alarm_tone_on
 
 
@@ -483,20 +495,20 @@ def _parse_mass2_work_status(data: bytes, parsed: dict) -> bool:
     False if it was truncated (e.g. fragmented across BLE notifications)
     so the caller can discard partial data.
 
-    Format (verified against MASS2WorkStatus.initData in the app):
+    Format:
       Byte 0: 0x31 frame header
       Byte 1: 0xC3 cmd word
-      Byte 2: total power in W (NOT port count — the app loops 8 times
-              regardless and only uses byte 2 for the total power display)
+      Byte 2: total power in W (NOT port count — the protocol always
+              includes 8 ports regardless, and byte 2 is the total power)
       Per port (7 bytes each, starting at byte 3):
         +0: status   (uint8) — 1 means actively delivering power
         +1: protocol (uint8: 0=none, 1=PD, 2=fast_charge)
-        +2: flags    (uint8) — semantics unclear; manufacturer app stores
-                     this in mUsbAlarmI but never displays it as an alarm
+        +2: flags    (uint8) — semantics unclear; stored internally as
+                     alarm indicator but never surfaced to the user
         +3-4: voltage (uint16 LE, mV)
         +5-6: current (uint16 LE, mA)
     """
-    # The app always parses exactly 8 ports regardless of byte 2.
+    # The protocol always includes exactly 8 ports regardless of byte 2.
     expected_len = 3 + MASS2_PORT_COUNT * 7
 
     if len(data) < expected_len:
@@ -507,9 +519,8 @@ def _parse_mass2_work_status(data: bytes, parsed: dict) -> bool:
         )
         return False
 
-    # Store the device-reported total power (byte 2). This matches what
-    # the manufacturer app shows ("15W TOTAL") instead of summing the
-    # per-port values, which can drift slightly from the device's own
+    # Store the device-reported total power (byte 2) instead of summing
+    # the per-port values, which can drift slightly from the device's own
     # internal accounting and includes phantom-pulse noise.
     parsed["_total_power"] = data[2]
 
@@ -592,7 +603,7 @@ def _parse_mass2_settings(data: bytes) -> dict | None:
 def build_mass2_settings_set_req(settings: dict) -> bytearray:
     """Build a MASS2SettingsSetReq packet from a settings dict.
 
-    Mirrors MASS2SettingsSetReq.assemble() in the manufacturer app.
+    Assembles a MASS2 settings-set request per the device protocol.
     """
     cmd = bytearray([0x12, 0xC8])
     cmd.append(settings.get("scheduledMute", 0) & 0xFF)
@@ -612,8 +623,7 @@ def build_mass2_settings_set_req(settings: dict) -> bytearray:
 def build_mass2_set_time_req(now, tz_offset_hours: int, is_24h: bool = True) -> bytearray:
     """Build SetTimeReq packet (CMD 0x12 0xCE) for the MASS2 RTC.
 
-    Mirrors MASS2Fragment.isConnected(true) in the manufacturer app, which
-    pushes the current wall-clock time on every successful connect. The
+    Pushes the current wall-clock time on every successful connect. The
     payload (after the 0x12 0xCE header) is::
 
         byte 0     : is_24h (0/1)

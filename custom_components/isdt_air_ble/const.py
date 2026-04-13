@@ -37,7 +37,7 @@ CHAR_UUID_AF02 = "0000af02-0000-1000-8000-00805f9b34fb"  # Write (hardware info)
 CMD_BIND_REQ = 0x18
 RESP_BIND = 0x19
 
-# BindReq status byte (last byte). The manufacturer app always sends 1.
+# BindReq status byte (last byte). Always 1 per the protocol.
 # The device decides itself whether the UUID is known or pairing is needed.
 BIND_STATUS = 0x01
 
@@ -183,10 +183,9 @@ CMD_MASS2_SETTINGS_REQ = bytearray([0x12, 0xCA])
 CMD_MASS2_SETTINGS_SET = bytearray([0x12, 0xC8])
 
 # SetTimeReq: push current wall-clock time + tz offset to the device RTC.
-# The manufacturer app sends this on every successful connect; without
-# it, the device clock stays on whatever it booted with (typically
-# 2000-01-01) and per-port schedules / alarm clocks would not fire at
-# the right time. Payload follows MASS2Fragment.isConnected(true).
+# Sent on every successful connect; without it, the device clock stays
+# on whatever it booted with (typically 2000-01-01) and per-port
+# schedules / alarm clocks would not fire at the right time.
 CMD_MASS2_SET_TIME = bytearray([0x12, 0xCE])
 
 # MASS2 response command bytes

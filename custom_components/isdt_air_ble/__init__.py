@@ -41,7 +41,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     # Persistent bind UUID — generate once and store in entry data so the
-    # device recognizes us across HA restarts. Matches manufacturer app behavior.
+    # device recognizes us across HA restarts.
     bind_uuid_hex = entry.data.get(CONF_BIND_UUID)
     if bind_uuid_hex:
         bind_uuid = bytes.fromhex(bind_uuid_hex)

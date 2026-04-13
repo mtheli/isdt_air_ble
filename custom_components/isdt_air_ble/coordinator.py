@@ -1,9 +1,8 @@
 """Data update coordinator for ISDT Air BLE charger.
 
-Uses a persistent BLE connection with continuous command cycling (matching
-the manufacturer app pattern).  Commands are sent one at a time every 100ms
-in an infinite loop.  Data is pushed to Home Assistant at the configured
-scan interval.
+Uses a persistent BLE connection with continuous command cycling.
+Commands are sent one at a time every 100ms in an infinite loop.
+Data is pushed to Home Assistant at the configured scan interval.
 """
 
 import asyncio
@@ -59,13 +58,14 @@ from .parser import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-TRACE = 5  # HA supports trace level below DEBUG (10)
+_RAW_LOGGER = logging.getLogger(__name__ + ".raw")
+_RAW_LOGGER.setLevel(logging.WARNING)  # silent unless explicitly enabled
 
 # Backoff limits for reconnection attempts
 _BACKOFF_MIN = 5
 _BACKOFF_MAX = 300
 
-# Command interval matching manufacturer app (100ms)
+# Command interval (100ms between commands)
 _CMD_INTERVAL = 0.1
 
 # Phantom-filter: low-power threshold for the sustained-active path.
@@ -252,7 +252,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
     # ------------------------------------------------------------------
 
     async def _live_monitoring_loop(self):
-        """Continuous command loop matching the manufacturer app pattern.
+        """Continuous command loop for live data polling.
 
         Sends one command every 100ms in a circular fashion.  After each
         full cycle (19 commands ≈ 1.9s), responses are collected, parsed,
@@ -568,7 +568,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
 
             # Negotiate a larger ATT MTU so the 59-byte MASS2 WorkStatus
             # response arrives in a single notification instead of 3
-            # fragments. The manufacturer app requests MTU=240; under BlueZ
+            # fragments. The protocol requests MTU=240; under BlueZ
             # we have to trigger negotiation explicitly via _acquire_mtu()
             # (otherwise BlueZ keeps the default 23-byte MTU).
             backend = getattr(self._client, "_backend", None)
@@ -613,9 +613,8 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
 
             # For MASS2 adapters: push current wall-clock time so per-port
             # schedules and alarm clocks fire at the correct times even
-            # when the user never opens the manufacturer app. Mirrors
-            # MASS2Fragment.isConnected(true) which sends this on every
-            # successful connect.
+            # when no other client has connected recently. The device
+            # protocol expects a time-sync on every successful connect.
             if self.device_type == DeviceType.ADAPTER:
                 await self._send_mass2_set_time()
 
@@ -655,7 +654,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         self._client.set_disconnected_callback(disconnected_callback)
 
         def notification_callback(sender, data):
-            _LOGGER.log(TRACE, "Notification received (%d bytes): %s", len(data), data.hex(" "))
+            _RAW_LOGGER.debug("Notification received (%d bytes): %s", len(data), data.hex(" "))
             if self.device_type == DeviceType.ADAPTER:
                 self._handle_adapter_notification(data)
             else:
@@ -673,8 +672,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
     def _handle_adapter_notification(self, data: bytes) -> None:
         """Reassemble fragmented MASS2 notifications into complete responses.
 
-        Frame format (verified against MASS2Fragment.onBleByte in the
-        manufacturer app):
+        Frame format:
             byte 0: 0x31 = frame header for normal MASS2 data packets
             byte 1: cmd word (0xC3 = WorkStatusResp, 0xC5/0xC7/0xCB = others)
             byte 2: payload-specific (port_count for WorkStatus)
@@ -737,18 +735,18 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.warning("Response queue full, dropping packet")
 
     async def _send_bind_request(self):
-        """Send bind request on AF02 (matching manufacturer app protocol).
+        """Send bind request on AF02.
 
         Packet: [0x18, uuid[0..15], 0x00, status=1]  (19 bytes)
 
-        The manufacturer app sends BindReq once and then passively waits for
+        The protocol sends BindReq once and then passively waits for
         a BindResp with result=0. The device behavior:
             - If the UUID is already known: device replies with bound=0 immediately
             - If the UUID is unknown: device beeps and waits for the user to
               press a button. After the press, the device sends bound=0
-              spontaneously (the app does not retransmit).
+              spontaneously (no retransmit needed).
 
-        We mirror this: send once, then wait up to 30 seconds for any
+        We follow this: send once, then wait up to 30 seconds for any
         BindResp with bound=0. Any intermediate bound=1 just means "still
         waiting for user".
         """
@@ -895,11 +893,10 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
     async def _send_mass2_set_time(self) -> None:
         """Push the current local wall-clock time to the device RTC.
 
-        Mirrors MASS2Fragment.isConnected(true) in the manufacturer app:
-        sent on every successful connect so per-port schedules and alarm
-        clocks fire at the right time even when the user never installs
-        the app. The device has no built-in NTP — without this it stays
-        on whatever time it booted with (typically 2000-01-01).
+        Sent on every successful connect so per-port schedules and alarm
+        clocks fire at the right time. The device has no built-in NTP —
+        without this it stays on whatever time it booted with (typically
+        2000-01-01).
         """
         from homeassistant.util import dt as dt_util
 

@@ -582,7 +582,7 @@ class ISDTMASS2PortStatusSensor(CoordinatorEntity, SensorEntity):
             return None
         ch = self.coordinator.data[self._channel]
 
-        # Trust the device-reported status byte (matches manufacturer app).
+        # Trust the device-reported status byte.
         # status == 1 means actively delivering power to a sink.
         if ch.get("status") == 1:
             return "active"
@@ -628,8 +628,8 @@ class ISDTMASS2PortStatusSensor(CoordinatorEntity, SensorEntity):
 class ISDTMASS2TotalPowerSensor(CoordinatorEntity, SensorEntity):
     """Total power across all USB ports.
 
-    Reads the device-reported total (byte 2 of WorkStatusResp), which
-    matches what the manufacturer app shows. Falls back to summing the
+    Reads the device-reported total (byte 2 of WorkStatusResp). Falls
+    back to summing the
     per-port power values if the device value is not yet available.
     """
 

@@ -368,7 +368,7 @@ Offset  Length  Field           Unit
 5       4       Input current   mA (LE) → ÷1000 = A
 ```
 
-The app only sends one `ElectricReq` for channel 0 (default). The device-level
+Only one `ElectricReq` for channel 0 is needed. The device-level
 input voltage/current is the same on all channels, as on the C4 Air.
 
 ### Feature Differences

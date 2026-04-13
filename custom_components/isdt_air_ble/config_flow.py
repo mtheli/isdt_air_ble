@@ -145,7 +145,7 @@ class ISDTConfigFlow(ConfigFlow, domain=DOMAIN):
     async def _async_pair_and_fetch_device_info(self, address: str) -> None:
         """Pair with the device and read hardware info.
 
-        Sends BindReq with status=1 (matching manufacturer app). The device
+        Sends BindReq with status=1 (the expected protocol value). The device
         responds with:
             BindResp result=0 → already known / accepted silently
             BindResp result=1 → device beeps, waits for the user to press a
@@ -193,7 +193,7 @@ class ISDTConfigFlow(ConfigFlow, domain=DOMAIN):
             _LOGGER.info("Sending BindReq during config flow")
             await client.write_gatt_char(CHAR_UUID_AF02, bind_cmd, response=False)
 
-            # The manufacturer app sends BindReq once and waits passively for
+            # The protocol sends BindReq once and waits passively for
             # a BindResp with bound=0. If the device needs pairing, it beeps,
             # waits for the user to press a button, then sends bound=0
             # spontaneously. We wait up to 30 seconds.
