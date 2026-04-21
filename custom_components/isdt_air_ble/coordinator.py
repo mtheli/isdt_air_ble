@@ -7,6 +7,7 @@ Data is pushed to Home Assistant at the configured scan interval.
 
 import asyncio
 import logging
+import time
 import uuid
 from collections.abc import Callable
 
@@ -158,6 +159,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         # Persistent BLE connection
         self._client: BleakClient | None = None
         self._connected = False
+        self._connect_time: float | None = None
         self._response_queue: asyncio.Queue = asyncio.Queue(maxsize=200)
         self._notification_started = False
 
@@ -264,8 +266,22 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
 
         while True:
             try:
+                # Release any stale BleakClient so BlueZ frees the connection
+                # slot — otherwise the slot stays allocated while we wait for
+                # the next advertisement, and new connects can't succeed.
+                if self._client and not (
+                    self._client.is_connected and self._notification_started
+                ):
+                    _LOGGER.info(
+                        "Stale client for %s (is_connected=%s, notifications=%s); cleaning up",
+                        self.address,
+                        self._client.is_connected,
+                        self._notification_started,
+                    )
+                    await self._disconnect()
+
                 # --- Ensure connection ---
-                if not (self._client and self._client.is_connected and self._notification_started):
+                if not self._client:
                     service_info = bluetooth.async_last_service_info(
                         self.hass, self.address, connectable=True
                     )
@@ -335,7 +351,8 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 raise
             except Exception as err:
                 _LOGGER.warning(
-                    "Live monitoring error: %s – waiting %ds before reconnect",
+                    "Live monitoring error: %s: %s – waiting %ds before reconnect",
+                    type(err).__name__,
                     err,
                     backoff,
                 )
@@ -592,6 +609,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             await self._setup_notifications()
             await self._send_bind_request()
             self._connected = True
+            self._connect_time = time.monotonic()
             _LOGGER.debug("Persistent connection established to %s", self.address)
 
             # Fetch hardware info once
@@ -619,18 +637,15 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 await self._send_mass2_set_time()
 
         except Exception as err:
-            _LOGGER.warning("Failed to connect: %s", err)
-            self._connected = False
-            # Properly disconnect if establish_connection succeeded but a
-            # later step (MTU, notifications, bind) failed — dropping the
-            # reference without disconnect() leaks the BlueZ connection slot.
-            if self._client:
-                try:
-                    async with asyncio.timeout(5.0):
-                        await self._client.disconnect()
-                except Exception:
-                    pass
-            self._client = None
+            _LOGGER.warning(
+                "Failed to connect to %s: %s: %s",
+                self.address,
+                type(err).__name__,
+                err,
+            )
+            # Route cleanup through _disconnect() so BlueZ slot is freed
+            # via the same path used everywhere else.
+            await self._disconnect()
             raise
 
     async def _setup_notifications(self):
@@ -642,12 +657,19 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             raise UpdateFailed("Client not connected, cannot setup notifications")
 
         def disconnected_callback(client):
-            _LOGGER.debug(
-                "BLE device disconnected: %s",
+            uptime = (
+                time.monotonic() - self._connect_time
+                if self._connect_time is not None
+                else -1.0
+            )
+            _LOGGER.info(
+                "BLE link dropped: %s (uptime=%.1fs)",
                 self.address,
+                uptime,
             )
             self._connected = False
             self._notification_started = False
+            self._connect_time = None
             # Notify entities so connected sensor updates immediately
             self.async_set_updated_data(self.data or {})
 
@@ -812,23 +834,46 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         called on the client object.
         """
         client = self._client
+        was_connected = self._connected
         self._client = None
         self._connected = False
         self._notification_started = False
+        self._connect_time = None
 
         if client is None:
             return
 
+        is_connected = getattr(client, "is_connected", None)
         try:
             async with asyncio.timeout(5.0):
                 try:
                     await client.stop_notify(CHAR_UUID_AF01)
-                except Exception:
-                    pass
+                except Exception as err:
+                    _LOGGER.debug("stop_notify failed during disconnect: %s", err)
                 await client.disconnect()
-                _LOGGER.debug("Disconnected from %s", self.address)
-        except (TimeoutError, Exception) as err:
-            _LOGGER.debug("Error during disconnect: %s", err)
+                _LOGGER.debug(
+                    "Disconnected from %s (was_connected=%s, bleak_is_connected=%s)",
+                    self.address,
+                    was_connected,
+                    is_connected,
+                )
+        except TimeoutError:
+            _LOGGER.warning(
+                "Disconnect timed out for %s after 5s (was_connected=%s, bleak_is_connected=%s) "
+                "— BlueZ slot may still be allocated",
+                self.address,
+                was_connected,
+                is_connected,
+            )
+        except Exception as err:
+            _LOGGER.info(
+                "Disconnect error for %s: %s: %s (was_connected=%s, bleak_is_connected=%s)",
+                self.address,
+                type(err).__name__,
+                err,
+                was_connected,
+                is_connected,
+            )
 
     # ------------------------------------------------------------------
     # DataUpdateCoordinator override – passive when live connection active
