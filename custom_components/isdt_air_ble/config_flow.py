@@ -38,6 +38,7 @@ from .const import (
     DeviceType,
     ISDT_MANUFACTURER_ID,
     RESP_BIND,
+    detect_model_from_mfg_data,
     get_device_type,
 )
 from .parser import parse_hardware_info
@@ -48,21 +49,23 @@ _LOGGER = logging.getLogger(__name__)
 def _detect_model(discovery_info: BluetoothServiceInfoBleak) -> str:
     """Detect device model from BLE manufacturer data.
 
-    The manufacturer_data contains model identification bytes at offset 2-5.
-    These are looked up in DEVICE_MODEL_MAP (from MyScanItemModel.java).
+    Tries the ``DeviceModelID`` map first, then falls back to the
+    advertisement's embedded ASCII name (e.g. "K2Air").  Logs a warning
+    only when both routes fail, so unknown but self-naming devices get
+    auto-resolved instead of stranded as "ISDT Device".
     """
     mfr_data = discovery_info.manufacturer_data.get(ISDT_MANUFACTURER_ID)
+    model = detect_model_from_mfg_data(mfr_data)
+    if model:
+        return model
+
     if mfr_data and len(mfr_data) >= 6:
-        model_id = (
-            f"{mfr_data[2]:02x}{mfr_data[3]:02x}{mfr_data[4]:02x}{mfr_data[5]:02x}"
-        )
-        model = DEVICE_MODEL_MAP.get(model_id)
-        if model:
-            return model
-        # Log unknown model IDs so we can add them to the map
+        model_id = mfr_data[2:6].hex()
         _LOGGER.warning(
-            "Unknown ISDT model ID '%s' from device '%s'. "
-            "Please add this to DEVICE_MODEL_MAP in const.py",
+            "Unknown ISDT model ID '%s' from device '%s' and no usable "
+            "ASCII name in the advertisement. Please open an issue with "
+            "this manufacturer_data so the model can be added to "
+            "DEVICE_MODEL_MAP in const.py.",
             model_id,
             discovery_info.name,
         )

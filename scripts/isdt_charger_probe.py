@@ -1,34 +1,9 @@
 #!/usr/bin/env python3
-"""ISDT Air8 BLE probe.
+"""ISDT charger BLE probe.
 
-Captures raw GATT notifications from an ISDT Air8 (LiPo balance charger,
-DeviceModelID 01030000) so the protocol can be implemented in the
-isdt_air_ble Home Assistant integration.
-
-Usage
------
-
-  python3 isdt_air8_probe.py --mac AA:BB:CC:DD:EE:FF \
-                             --bind-uuid 9945...61fa \
-                             --label "no battery"
-
-The bind UUID is the 16-byte client identifier that was used when the
-device was paired the first time. You can read it from a Home Assistant
-debug log line like::
-
-    Sending BindReq on AF02: 18 99 45 6a 7c 65 e2 45 8e 83 b9 ac \
-                              31 33 56 61 fa 00 01
-                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                                  these 16 bytes are the bind UUID
-
-If --bind-uuid is omitted, a random one is generated and you will be
-asked to press the button on the device to confirm pairing.
-
-Before running, **disable** or stop the Home Assistant integration so
-that HA releases the BLE connection.
-
-Output goes to stdout and to a JSONL file (one entry per write/notify
-event). Attach the JSONL file to the GitHub issue.
+Captures raw GATT notifications from any ISDT BLE charger so the
+response payloads can be inspected and fed into the isdt_air_ble
+Home Assistant integration as test fixtures.
 """
 
 from __future__ import annotations
@@ -46,6 +21,56 @@ try:
     from bleak import BleakClient, BleakScanner
 except ImportError:
     sys.exit("bleak is required: pip install bleak")
+
+
+DESCRIPTION = (
+    "Capture raw GATT notifications from any ISDT BLE charger "
+    "(C4 Air, A8 Air, Air 8, A4 Air, K2 Air, ...) for inclusion as "
+    "test fixtures in the isdt_air_ble Home Assistant integration."
+)
+
+EPILOG = """\
+Examples
+--------
+
+  # C4 Air (6 slots), all slots empty:
+  isdt_charger_probe.py --mac AA:BB:CC:DD:EE:FF --channels 0-5 \\
+                        --bind-uuid 9945...61fa \\
+                        --label "c4air_empty"
+
+  # K2 Air (2 slots), one cell charging:
+  isdt_charger_probe.py --mac AA:BB:CC:DD:EE:FF --channels 0-1 \\
+                        --label "k2air_1cell_charging"
+
+  # Air 8 (single LiPo channel), 4S pack:
+  isdt_charger_probe.py --mac AA:BB:CC:DD:EE:FF --channels 0 \\
+                        --label "air8_4s_charging"
+
+
+Bind UUID
+---------
+
+The bind UUID is the 16-byte client identifier used when the device
+was paired the first time. You can read it from a Home Assistant
+debug log line like:
+
+  Sending BindReq on AF02: 18 99 45 6a 7c 65 e2 45 8e 83 b9 ac \\
+                              31 33 56 61 fa 00 01
+                              \\___________________________/
+                               these 16 bytes are the bind UUID
+
+Omit --bind-uuid to generate a random one; the device will then ask
+you to press its button within ~30 s to confirm pairing.
+
+
+Before running
+--------------
+
+Stop or disable the isdt_air_ble integration in Home Assistant so
+HA releases the BLE connection. Output is written to stdout and to a
+JSONL file -- attach that file to the GitHub issue or share it with
+the maintainer.
+"""
 
 
 CHAR_UUID_AF01 = "0000af01-0000-1000-8000-00805f9b34fb"
@@ -154,7 +179,8 @@ async def do_bind(client: BleakClient, bind_uuid: bytes, capture: Capture) -> bo
                     if data[1] == 1:
                         print(
                             "\n  ⚠  Device is waiting for the button press.\n"
-                            "     Press the button on the Air8 to confirm pairing.\n"
+                            "     Press the button on the charger to confirm "
+                            "pairing.\n"
                         )
                         capture.write("bind", status="waiting_for_button")
                         continue
@@ -206,7 +232,7 @@ async def probe_once(
     await client.write_gatt_char(CHAR_UUID_AF02, CMD_HARDWARE_INFO_REQ, response=False)
     await asyncio.sleep(settle)
 
-    # Alarm tone (read once — same on Air8?)
+    # Alarm tone (read once)
     capture.write("write", char="AF01", purpose="AlarmToneReq",
                   len=len(CMD_ALARM_TONE_REQ), hex=hexs(CMD_ALARM_TONE_REQ))
     await client.write_gatt_char(CHAR_UUID_AF01, CMD_ALARM_TONE_REQ, response=False)
@@ -237,21 +263,27 @@ async def probe_once(
 
 
 async def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--mac", required=True, help="BLE MAC of the Air8")
+    ap = argparse.ArgumentParser(
+        description=DESCRIPTION,
+        epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    ap.add_argument("--mac", required=True, help="BLE MAC address of the charger")
     ap.add_argument("--bind-uuid", default=None,
                     help="16-byte bind UUID as hex (with or without spaces). "
                          "Omit to generate a random one (requires button press).")
     ap.add_argument("--channels", default="0-5",
-                    help="Channel range to probe (default 0-5, matches Air 8's "
-                         "max 6S LiPo). Examples: '0', '0-7', '0,3,5'.")
+                    help="Channel range to probe (default 0-5 = C4 Air). "
+                         "Examples: '0' (Air 8 single channel), '0-7' (A8 Air), "
+                         "'0,3,5'.")
     ap.add_argument("--settle", type=float, default=1.0,
                     help="Seconds to wait after each request (default 1.0).")
     ap.add_argument("--label", default="run",
-                    help="Free-text label saved in the capture (e.g. 'no battery', "
-                         "'1S LiPo charging', '6S LiPo done').")
+                    help="Free-text label saved in the capture (e.g. 'c4air_empty', "
+                         "'c4air_1cell_charging', 'air8_6s_idle').")
     ap.add_argument("--output", default=None,
-                    help="JSONL file to write (default: air8_probe_<label>_<ts>.jsonl).")
+                    help="JSONL file to write (default: "
+                         "isdt_probe_<label>_<ts>.jsonl).")
     args = ap.parse_args()
 
     channels: list[int] = []
@@ -265,16 +297,27 @@ async def main() -> int:
 
     if args.bind_uuid:
         hex_only = args.bind_uuid.replace(" ", "").replace(":", "")
-        bind_uuid = bytes.fromhex(hex_only)
+        try:
+            bind_uuid = bytes.fromhex(hex_only)
+        except ValueError:
+            sys.exit(
+                f"--bind-uuid must be 32 hex characters (16 bytes), "
+                f"got {len(hex_only)} characters including non-hex content "
+                f"({args.bind_uuid!r}). Omit --bind-uuid to generate a "
+                f"random one and confirm pairing with the device button."
+            )
         if len(bind_uuid) != 16:
-            sys.exit(f"bind-uuid must be 16 bytes, got {len(bind_uuid)}")
+            sys.exit(
+                f"--bind-uuid must be 16 bytes (32 hex chars), got "
+                f"{len(bind_uuid)} bytes from {hex_only!r}."
+            )
     else:
         bind_uuid = secrets.token_bytes(16)
         print(f"generated random bind UUID: {hexs(bind_uuid)}")
 
     ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_label = "".join(c if c.isalnum() else "_" for c in args.label)
-    out_path = args.output or f"air8_probe_{safe_label}_{ts}.jsonl"
+    out_path = args.output or f"isdt_probe_{safe_label}_{ts}.jsonl"
     capture = Capture(out_path)
     capture.write("meta", mac=args.mac, label=args.label, channels=str(channels),
                   bind_uuid=hexs(bind_uuid))

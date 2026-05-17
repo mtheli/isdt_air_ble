@@ -2,6 +2,7 @@
 
 import logging
 
+from homeassistant.components.bluetooth import async_last_service_info
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -17,6 +18,8 @@ from .const import (
     DEFAULT_PHANTOM_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    ISDT_MANUFACTURER_ID,
+    detect_model_from_mfg_data,
 )
 from .coordinator import ISDTDataUpdateCoordinator
 
@@ -29,6 +32,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up ISDT Air BLE from a config entry."""
     address = entry.data["address"]
     model = entry.data.get("model", "C4 Air")
+
+    # Re-detect model from the cached BLE manufacturer data on every load.
+    # Early Air 8 setups were misidentified as "C4 Air" because the device
+    # model ID 01030000 used to be mapped there. This silently migrates
+    # affected entries without forcing the user to delete & re-add.
+    detected_model = _detect_model_from_cache(hass, address)
+    if detected_model and detected_model != model:
+        _LOGGER.warning(
+            "Re-detected device at %s as '%s' (was '%s') — updating config entry",
+            address, detected_model, model,
+        )
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, "model": detected_model},
+        )
+        model = detected_model
+
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     phantom_threshold = entry.options.get(
         CONF_PHANTOM_THRESHOLD, DEFAULT_PHANTOM_THRESHOLD
@@ -80,6 +99,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload the entry when options change."""
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+def _detect_model_from_cache(hass: HomeAssistant, address: str) -> str | None:
+    """Look up the device's current model from cached BLE advertisements."""
+    service_info = async_last_service_info(hass, address, connectable=True)
+    if service_info is None:
+        return None
+    return detect_model_from_mfg_data(
+        service_info.manufacturer_data.get(ISDT_MANUFACTURER_ID)
+    )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

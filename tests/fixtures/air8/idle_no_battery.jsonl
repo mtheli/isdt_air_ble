@@ -1,0 +1,51 @@
+{"t": "2026-05-15T15:59:18.147", "kind": "meta", "mac": "84:C2:E4:C5:3E:6A", "label": "idle_no_battery", "channels": "[0, 1, 2, 3, 4, 5]", "bind_uuid": "99 45 6a 7c 65 e2 45 8e 83 b9 ac 31 33 56 61 fa"}
+{"t": "2026-05-15T15:59:21.660", "kind": "connect", "mtu": 23}
+{"t": "2026-05-15T15:59:22.481", "kind": "write", "char": "AF02", "purpose": "BindReq", "len": 19, "hex": "18 99 45 6a 7c 65 e2 45 8e 83 b9 ac 31 33 56 61 fa 00 01"}
+{"t": "2026-05-15T15:59:22.690", "kind": "notify", "char": "AF02", "cls": "BindResp", "len": 2, "hex": "19 00"}
+{"t": "2026-05-15T15:59:22.690", "kind": "bind", "status": "ok"}
+{"t": "2026-05-15T15:59:25.140", "kind": "write", "char": "AF02", "purpose": "HardwareInfoReq", "len": 1, "hex": "e0"}
+{"t": "2026-05-15T15:59:25.810", "kind": "notify", "char": "AF02", "cls": "HardwareInfoResp", "len": 13, "hex": "e1 01 01 01 06 43 45 4e 54 50 45 52 49"}
+{"t": "2026-05-15T15:59:26.142", "kind": "write", "char": "AF01", "purpose": "AlarmToneReq", "len": 2, "hex": "12 92"}
+{"t": "2026-05-15T15:59:27.144", "kind": "section", "channel": 0}
+{"t": "2026-05-15T15:59:27.145", "kind": "write", "char": "AF01", "purpose": "WorkStateReq", "channel": 0, "len": 3, "hex": "13 e6 00"}
+{"t": "2026-05-15T15:59:27.762", "kind": "notify", "char": "AF01", "cls": "frame(WorkStateResp)", "len": 38, "hex": "31 e7 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 06 00 68 10 bc 02 00 00 34 00 00 00 04 29 70 64 08 00 00 00"}
+{"t": "2026-05-15T15:59:28.147", "kind": "write", "char": "AF01", "purpose": "ElectricReq", "channel": 0, "len": 3, "hex": "12 e4 00"}
+{"t": "2026-05-15T15:59:28.933", "kind": "notify", "char": "AF01", "cls": "frame(ElectricResp)", "len": 31, "hex": "31 e5 00 13 36 48 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"}
+{"t": "2026-05-15T15:59:29.151", "kind": "write", "char": "AF01", "purpose": "IRReq", "channel": 0, "len": 3, "hex": "13 fa 00"}
+{"t": "2026-05-15T15:59:29.908", "kind": "notify", "char": "AF01", "cls": "frame(IRResp)", "len": 19, "hex": "31 fb 00 ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff"}
+{"t": "2026-05-15T15:59:30.155", "kind": "section", "channel": 1}
+{"t": "2026-05-15T15:59:30.156", "kind": "write", "char": "AF01", "purpose": "WorkStateReq", "channel": 1, "len": 3, "hex": "13 e6 01"}
+{"t": "2026-05-15T15:59:30.883", "kind": "notify", "char": "AF01", "cls": "frame(WorkStateResp)", "len": 38, "hex": "31 e7 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 06 00 68 10 bc 02 00 00 34 00 00 00 04 29 70 64 08 00 00 00"}
+{"t": "2026-05-15T15:59:31.157", "kind": "write", "char": "AF01", "purpose": "ElectricReq", "channel": 1, "len": 3, "hex": "12 e4 01"}
+{"t": "2026-05-15T15:59:31.661", "kind": "notify", "char": "AF01", "cls": "frame(ElectricResp)", "len": 31, "hex": "31 e5 01 13 36 48 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"}
+{"t": "2026-05-15T15:59:32.162", "kind": "write", "char": "AF01", "purpose": "IRReq", "channel": 1, "len": 3, "hex": "13 fa 01"}
+{"t": "2026-05-15T15:59:32.831", "kind": "notify", "char": "AF01", "cls": "frame(IRResp)", "len": 19, "hex": "31 fb 01 ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff"}
+{"t": "2026-05-15T15:59:33.165", "kind": "section", "channel": 2}
+{"t": "2026-05-15T15:59:33.166", "kind": "write", "char": "AF01", "purpose": "WorkStateReq", "channel": 2, "len": 3, "hex": "13 e6 02"}
+{"t": "2026-05-15T15:59:33.806", "kind": "notify", "char": "AF01", "cls": "frame(WorkStateResp)", "len": 38, "hex": "31 e7 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 06 00 68 10 bc 02 00 00 34 00 00 00 04 29 70 64 08 00 00 00"}
+{"t": "2026-05-15T15:59:34.170", "kind": "write", "char": "AF01", "purpose": "ElectricReq", "channel": 2, "len": 3, "hex": "12 e4 02"}
+{"t": "2026-05-15T15:59:34.392", "kind": "notify", "char": "AF01", "cls": "frame(ElectricResp)", "len": 31, "hex": "31 e5 02 17 36 48 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"}
+{"t": "2026-05-15T15:59:35.176", "kind": "write", "char": "AF01", "purpose": "IRReq", "channel": 2, "len": 3, "hex": "13 fa 02"}
+{"t": "2026-05-15T15:59:35.561", "kind": "notify", "char": "AF01", "cls": "frame(IRResp)", "len": 19, "hex": "31 fb 02 ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff"}
+{"t": "2026-05-15T15:59:36.181", "kind": "section", "channel": 3}
+{"t": "2026-05-15T15:59:36.181", "kind": "write", "char": "AF01", "purpose": "WorkStateReq", "channel": 3, "len": 3, "hex": "13 e6 03"}
+{"t": "2026-05-15T15:59:36.538", "kind": "notify", "char": "AF01", "cls": "frame(WorkStateResp)", "len": 38, "hex": "31 e7 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 06 00 68 10 bc 02 00 00 34 00 00 00 04 29 70 64 08 00 00 00"}
+{"t": "2026-05-15T15:59:37.185", "kind": "write", "char": "AF01", "purpose": "ElectricReq", "channel": 3, "len": 3, "hex": "12 e4 03"}
+{"t": "2026-05-15T15:59:37.511", "kind": "notify", "char": "AF01", "cls": "frame(ElectricResp)", "len": 31, "hex": "31 e5 03 17 36 48 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"}
+{"t": "2026-05-15T15:59:38.191", "kind": "write", "char": "AF01", "purpose": "IRReq", "channel": 3, "len": 3, "hex": "13 fa 03"}
+{"t": "2026-05-15T15:59:38.488", "kind": "notify", "char": "AF01", "cls": "frame(IRResp)", "len": 19, "hex": "31 fb 03 00 00 07 00 7e af 00 00 04 00 04 db ff ff c4 a7"}
+{"t": "2026-05-15T15:59:39.194", "kind": "section", "channel": 4}
+{"t": "2026-05-15T15:59:39.195", "kind": "write", "char": "AF01", "purpose": "WorkStateReq", "channel": 4, "len": 3, "hex": "13 e6 04"}
+{"t": "2026-05-15T15:59:39.461", "kind": "notify", "char": "AF01", "cls": "frame(WorkStateResp)", "len": 38, "hex": "31 e7 04 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 06 00 68 10 bc 02 00 00 34 00 00 00 04 29 70 64 08 00 00 00"}
+{"t": "2026-05-15T15:59:40.198", "kind": "write", "char": "AF01", "purpose": "ElectricReq", "channel": 4, "len": 3, "hex": "12 e4 04"}
+{"t": "2026-05-15T15:59:40.436", "kind": "notify", "char": "AF01", "cls": "frame(ElectricResp)", "len": 31, "hex": "31 e5 04 17 36 48 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"}
+{"t": "2026-05-15T15:59:41.202", "kind": "write", "char": "AF01", "purpose": "IRReq", "channel": 4, "len": 3, "hex": "13 fa 04"}
+{"t": "2026-05-15T15:59:41.412", "kind": "notify", "char": "AF01", "cls": "frame(IRResp)", "len": 19, "hex": "31 fb 04 ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff"}
+{"t": "2026-05-15T15:59:42.205", "kind": "section", "channel": 5}
+{"t": "2026-05-15T15:59:42.205", "kind": "write", "char": "AF01", "purpose": "WorkStateReq", "channel": 5, "len": 3, "hex": "13 e6 05"}
+{"t": "2026-05-15T15:59:42.971", "kind": "notify", "char": "AF01", "cls": "frame(WorkStateResp)", "len": 38, "hex": "31 e7 05 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 06 00 68 10 bc 02 00 00 34 00 00 00 04 29 70 64 08 00 00 00"}
+{"t": "2026-05-15T15:59:43.211", "kind": "write", "char": "AF01", "purpose": "ElectricReq", "channel": 5, "len": 3, "hex": "12 e4 05"}
+{"t": "2026-05-15T15:59:43.947", "kind": "notify", "char": "AF01", "cls": "frame(ElectricResp)", "len": 31, "hex": "31 e5 05 12 36 48 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"}
+{"t": "2026-05-15T15:59:44.217", "kind": "write", "char": "AF01", "purpose": "IRReq", "channel": 5, "len": 3, "hex": "13 fa 05"}
+{"t": "2026-05-15T15:59:44.921", "kind": "notify", "char": "AF01", "cls": "frame(IRResp)", "len": 19, "hex": "31 fb 05 ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff"}
+{"t": "2026-05-15T15:59:48.823", "kind": "done", "events": 50}

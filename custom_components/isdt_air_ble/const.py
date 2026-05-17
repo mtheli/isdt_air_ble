@@ -1,3 +1,4 @@
+import re
 from enum import StrEnum
 
 DOMAIN = "isdt_air_ble"
@@ -80,18 +81,18 @@ RESP_ELECTRIC      = 0xE5   # ElectricResp
 RESP_WORKSTATE     = 0xE7   # ChargerWorkStateResp
 RESP_IR            = 0xFB   # IRResp
 
-# WorkState status mapping (from C4AirModel.java)
+# WorkState status mapping for round-cell chargers (C4 Air, A8 Air, …)
 WORK_STATE_MAP = {
     0: "idle",
     1: "charging",  # Pre-charge / trickle phase
-    2: "charging",  # Confirmed: active charging (CC phase)
-    3: "charging",  # Confirmed: orange with lightning bolt in app
+    2: "charging",  # Active charging (CC phase)
+    3: "charging",  # Active charging
     4: "charging",  # CV phase / topping
     5: "error",
-    6: "done",      # Confirmed: 100% capacity_percentage, fully charged
+    6: "done",      # 100% capacity_percentage, fully charged
 }
 
-# Battery type mapping (from C4AirModel.java setChemistryCapacity)
+# Battery type mapping for round-cell chargers
 BATTERY_TYPE_MAP = {
     0: "LiHV",     # 4.35V Lithium High Voltage
     1: "LiIon",    # 4.20V Standard Lithium-Ion
@@ -102,16 +103,53 @@ BATTERY_TYPE_MAP = {
     6: "Auto",     # Automatic detection
 }
 
+# WorkState mapping for the Air 8 LiPo balance charger.
+# The Air 8 firmware uses a different state enum than the round-cell
+# chargers (idle/CC/CV plus storage, discharge and balance modes).
+# v1 collapses every non-idle, non-done state to "charging" so the
+# existing status sensor enum (empty/idle/charging/done/error) stays valid.
+AIR8_WORK_STATE_MAP = {
+    0: "idle",
+    3: "charging",     # CC fast-charge
+    4: "charging",
+    5: "charging",     # ≥90% / CV
+    6: "done",         # full
+    7: "charging",     # storage modes
+    8: "charging",
+    9: "charging",
+    10: "charging",
+    11: "done",        # storage complete
+    12: "charging",    # discharge in progress
+    13: "done",        # discharge complete
+    14: "charging",    # balance/destroy
+    15: "done",
+    16: "charging",
+    17: "charging",
+    18: "charging",
+}
+
+# Battery chemistry mapping for the Air 8 LiPo balance charger.
+# The enum is different from the round-cell chargers — index 1 is LiPo
+# (not LiIon) and the higher indices are LiPo-specific chemistries.
+AIR8_BATTERY_TYPE_MAP = {
+    0: "LiHV",     # 4.35V Lithium High Voltage
+    1: "LiPo",     # 4.20V Lithium Polymer
+    2: "LiIon",    # 4.20V Lithium-Ion
+    3: "LiFe",     # 3.65V Lithium Iron Phosphate
+    4: "Pb",       # Lead-Acid
+    5: "NiMH/Cd",  # Nickel Metal Hydride / Cadmium
+    6: "ULiHV",    # Ultra-High Voltage LiHV
+}
+
 # Manufacturer data company ID (ISDT)
 ISDT_MANUFACTURER_ID = 43962  # 0xABBA
 
 # Device model lookup from manufacturer_data bytes [2:6]
-# Extracted from MyScanItemModel.java
 DEVICE_MODEL_MAP = {
     "01010000": "NP2 Air",
     "01020000": "LP2 Air",
-    "01030000": "C4 Air",
-    "01040000": "C4 EVO",
+    "01030000": "Air 8",
+    "01040000": "K2 Air",
     "01050000": "608PD",
     "01060000": "K4",
     "01070000": "C4 Air",
@@ -142,6 +180,8 @@ MODEL_DEVICE_TYPE_MAP: dict[str, DeviceType] = {
 MODEL_CHANNEL_COUNT_MAP: dict[str, int] = {
     "A8 Air": 8,  # Channels 0-7
     "A4 Air": 4,
+    "K2 Air": 2,  # Two-slot round-cell charger
+    "Air 8": 1,   # Single LiPo pack port (up to 6 cells on one channel)
     # Default for most chargers is 6 channels
 }
 
@@ -222,3 +262,41 @@ MODEL_OTA_NAME_MAP: dict[str, str] = {
     "EDGE": "EDGE",
     "Power 200": "Power200",
 }
+
+
+def detect_model_from_mfg_data(mfr_data: bytes | None) -> str | None:
+    """Best-effort device-model detection from ISDT BLE manufacturer data.
+
+    ISDT advertisements carry a 2-byte magic prefix ``af fa`` followed by a
+    4-byte ``DeviceModelID`` at offset 2-5.  Many devices additionally
+    embed their marketing name as a NUL-terminated ASCII string starting
+    at offset 6 (e.g. ``K2Air`` on the K2 Air, ``C4Air`` on the C4 Air).
+
+    Resolution order:
+      1. Exact ``DeviceModelID`` lookup in ``DEVICE_MODEL_MAP``.
+      2. ASCII fallback from the embedded name, normalised so a digit
+         followed by a letter gets a space ("K2Air" → "K2 Air").
+
+    Returning ``None`` means "unknown" — the caller should keep the
+    previously stored model name or log a warning, but never invent one.
+    """
+    if not mfr_data or len(mfr_data) < 6:
+        return None
+
+    model_id = mfr_data[2:6].hex()
+    model = DEVICE_MODEL_MAP.get(model_id)
+    if model:
+        return model
+
+    name_bytes = mfr_data[6:].split(b"\x00", 1)[0]
+    if not name_bytes:
+        return None
+    try:
+        name = name_bytes.decode("ascii").strip()
+    except UnicodeDecodeError:
+        return None
+    if not name.isprintable() or not name:
+        return None
+    # ISDT joins the model line and the product suffix without a space
+    # ("K2Air"), but the integration uses spaced names ("K2 Air").
+    return re.sub(r"(\d)([A-Za-z])", r"\1 \2", name)

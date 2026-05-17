@@ -12,6 +12,8 @@ from .const import (
     RESP_MASS2_WORK_STATUS,
     WORK_STATE_MAP,
     BATTERY_TYPE_MAP,
+    AIR8_WORK_STATE_MAP,
+    AIR8_BATTERY_TYPE_MAP,
     MASS2_PORT_COUNT,
     MASS2_PROTOCOL_MAP,
 )
@@ -147,7 +149,6 @@ def parse_charger_responses(responses: list[bytes], num_channels: int = 6, model
         if ch not in parsed:
             # A8 Air firmware sends ElectricResp with a hardcoded channel
             # value >= num_channels (device-level data, not per-slot).
-            # A8 Air ElectricResp channelId is not meaningful (device-level data).
             # Remap to channel 0 so device-level sensors can read it.
             if is_a8_air and cmd == RESP_ELECTRIC:
                 _LOGGER.debug(
@@ -165,7 +166,7 @@ def parse_charger_responses(responses: list[bytes], num_channels: int = 6, model
         if cmd == RESP_ELECTRIC:
             parsed[ch].update(parse_electric(raw))
         elif cmd == RESP_WORKSTATE:
-            parsed[ch].update(parse_workstate(raw))
+            parsed[ch].update(parse_workstate(raw, model=model))
         elif cmd == RESP_IR:
             parsed[ch].update(parse_ir(raw))
         else:
@@ -270,7 +271,7 @@ def parse_electric(data: bytes) -> dict:
     }
 
 
-def parse_workstate(data: bytes) -> dict:
+def parse_workstate(data: bytes, model: str = "C4 Air") -> dict:
     """Parse ChargerWorkStateResp (CMD RESP_WORKSTATE): charge state, capacity, time, etc.
 
     Format: [0x31, RESP_WORKSTATE, channel,
@@ -284,6 +285,9 @@ def parse_workstate(data: bytes) -> dict:
 
     A8 Air mega-packet data is pre-converted to this format by
     _parse_a8_air_workstate_mega() before reaching this function.
+
+    The Air 8 LiPo balance charger uses different work-state and battery-type
+    enums than the round-cell chargers — pass ``model="Air 8"`` to apply them.
     """
     if len(data) < 38:
         _LOGGER.warning("WorkStateResp too short: %d bytes", len(data))
@@ -310,8 +314,15 @@ def parse_workstate(data: bytes) -> dict:
     error_code          = int.from_bytes(data[36:38], "little")
     parallel_state      = data[38] == 1 if len(data) > 38 else None
 
-    work_state_str   = WORK_STATE_MAP.get(work_state, f"unknown_{work_state}")
-    battery_type_str = BATTERY_TYPE_MAP.get(battery_type, f"unknown_{battery_type}")
+    if model == "Air 8":
+        ws_map = AIR8_WORK_STATE_MAP
+        bt_map = AIR8_BATTERY_TYPE_MAP
+    else:
+        ws_map = WORK_STATE_MAP
+        bt_map = BATTERY_TYPE_MAP
+
+    work_state_str   = ws_map.get(work_state, f"unknown_{work_state}")
+    battery_type_str = bt_map.get(battery_type, f"unknown_{battery_type}")
 
     hours, rem = divmod(work_period, 3600)
     minutes, seconds = divmod(rem, 60)
