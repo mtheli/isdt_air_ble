@@ -128,7 +128,7 @@ AIR8_WORK_STATE_MAP = {
     18: "charging",
 }
 
-# Battery chemistry mapping for the Air 8 LiPo balance charger.
+# Battery chemistry mapping for LiPo balance chargers (Air 8, K2 Air).
 # The enum is different from the round-cell chargers — index 1 is LiPo
 # (not LiIon) and the higher indices are LiPo-specific chemistries.
 AIR8_BATTERY_TYPE_MAP = {
@@ -140,6 +140,16 @@ AIR8_BATTERY_TYPE_MAP = {
     5: "NiMH/Cd",  # Nickel Metal Hydride / Cadmium
     6: "ULiHV",    # Ultra-High Voltage LiHV
 }
+
+# Charger families that share the LiPo balance-charger work-state and
+# battery-chemistry enums. The wire protocol is identical to the round-cell
+# chargers; only the byte 17 (battery_type) and byte 3 (work_state) field
+# semantics differ.
+#
+# Members:
+#   - "Air 8" (single channel, 1S-8S)
+#   - "K2 Air" (two independent channels, 1S-6S each, parallel mode 1S-12S)
+BALANCE_CHARGER_MODELS = frozenset({"Air 8", "K2 Air"})
 
 # Manufacturer data company ID (ISDT)
 ISDT_MANUFACTURER_ID = 43962  # 0xABBA

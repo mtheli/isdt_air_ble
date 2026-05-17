@@ -287,3 +287,36 @@ def test_air8_explicit_battery_type_mapping_distinct():
     assert parsed[0]["battery_type_str"] == "LiPo"
     # Air 8 map: 3 → "charging"
     assert parsed[0]["work_state_str"] == "charging"
+
+
+def test_k2air_uses_balance_charger_enums():
+    """K2 Air is a dual-channel LiPo balance charger and must share the
+    Air 8 work-state and battery-chemistry maps. v0.9.0 routed it through
+    the round-cell C4-Air enums by accident — battery_type=1 was labelled
+    "LiIon" instead of "LiPo". Regression guard for that path."""
+    # Two channels, each carrying a battery_type=1 LiPo pack.
+    frames = []
+    for ch in range(2):
+        frame = bytearray(38)
+        frame[0] = 0x31
+        frame[1] = 0xE7
+        frame[2] = ch
+        frame[3] = 0x03   # charging (CC)
+        frame[17] = 0x01  # LiPo
+        frame[18] = 4     # 4S detected on each channel
+        frames.append(bytes(frame))
+
+    parsed, _ = parse_charger_responses(
+        frames, num_channels=2, model="K2 Air"
+    )
+
+    for ch in range(2):
+        # K2 Air must use the Air 8 maps (battery_type=1 → "LiPo"), not
+        # the round-cell map ("LiIon"). This is the regression we ship to
+        # fix in v0.9.1.
+        assert parsed[ch]["battery_type_str"] == "LiPo", (
+            f"channel {ch} reported {parsed[ch]['battery_type_str']!r} — "
+            "K2 Air should route through the LiPo balance-charger enum"
+        )
+        assert parsed[ch]["work_state_str"] == "charging"
+        assert parsed[ch]["unit_serials_num"] == 4
