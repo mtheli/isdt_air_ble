@@ -103,6 +103,33 @@ def test_cells_sum_to_pack_voltage_all_fixtures():
         assert sum(populated) == pytest.approx(ch0["output_voltage"], abs=0.005)
 
 
+def test_per_cell_ir_array_layout():
+    """The parser must surface ir_raw[] with sentinel 0xFFFF for the
+    cells that aren't populated. The card reads this per-cell to draw
+    individual IR readings on a balance-charger view, so the layout
+    contract matters.
+
+    TRES9000's 6S capture: cells 0-5 carry real IR values, cells 6-7
+    are sentinels (0xFFFF).
+    """
+    ch0, _ = _replay("idle_6s_battery.jsonl")
+    ir_raw = ch0["ir_raw"]
+
+    # Eight slots are decoded from the 19-byte short IRResp.
+    assert len(ir_raw) == 8
+
+    # First six are real (the 6S pack): in the single-to-tens of mΩ band
+    # once divided by 10. Raw range therefore 10-1000.
+    for idx in range(6):
+        assert 10 <= ir_raw[idx] < 1000, (
+            f"cell {idx + 1} IR raw {ir_raw[idx]} is outside the sane band"
+        )
+
+    # Cells 7 and 8 are sentinel — 0xFFFF.
+    assert ir_raw[6] == 0xFFFF
+    assert ir_raw[7] == 0xFFFF
+
+
 def test_primary_ir_in_range_with_battery():
     """With a healthy pack present, the primary cell IR is plausible."""
     # 6S pack — TRES9000's measured first-cell IR was 8.1 mΩ

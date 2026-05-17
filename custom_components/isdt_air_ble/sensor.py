@@ -407,6 +407,27 @@ class ISDTC4CellVoltageSensor(ISDTC4AirSensorBase):
         return None
 
     @property
+    def extra_state_attributes(self):
+        """Expose the matching per-cell internal resistance in mΩ.
+
+        The raw IR array carries 0xFFFF (= 65535) as the "no cell" sentinel
+        and 0 for cells that haven't been measured yet. Both map to ``None``
+        so the Lovelace card can suppress display rather than show a fake
+        value. Sane cells read in the single-to-tens-of-mΩ range, so we
+        also drop anything above 10 000 raw (= 1 000 mΩ) as a guard against
+        garbage frames.
+        """
+        if not self.coordinator.data or self._channel not in self.coordinator.data:
+            return None
+        ir_raw = self.coordinator.data[self._channel].get("ir_raw") or []
+        if self._cell_index >= len(ir_raw):
+            return None
+        raw = ir_raw[self._cell_index]
+        if raw is None or raw == 0 or raw >= 10000:
+            return None
+        return {"ir_mohm": raw / 10.0}
+
+    @property
     def available(self):
         """Only available when a cell is actually present."""
         return self.native_value is not None
