@@ -6,7 +6,7 @@
 
 Custom Home Assistant integration for **ISDT chargers** and the **MASS2** USB power adapter with Bluetooth Low Energy (BLE) connectivity. Communicates directly with the device via a persistent BLE connection — no cloud, no app required.
 
-Supports the **C4 Air** (6-channel charger), **A8 Air** (8-channel charger), and **MASS2** (8-port USB adapter).
+Supports the **C4 Air** (6-channel charger), **A8 Air** (8-channel charger), **Air 8** (1S–8S LiPo balance charger), and **MASS2** (8-port USB adapter).
 
 ![Device Overview](images/device_overview.png)
 
@@ -32,7 +32,7 @@ A matching dashboard card is available: **[ISDT Charger Card](https://github.com
 | ISDT K4 | Charger | Untested |
 | ISDT 608PD | Charger | Untested |
 
-The integration auto-detects the device model from BLE manufacturer data and exposes the appropriate entities (6 slot sub-devices for C4 Air, 8 slot sub-devices for A8 Air, 8 USB port sub-devices for MASS2). Other ISDT devices using the same BLE protocol may also work — feedback and reports are welcome.
+The integration auto-detects the device model from BLE manufacturer data and exposes the appropriate entities (6 slot sub-devices for C4 Air, 8 slot sub-devices for A8 Air, 1 pack sub-device with per-cell voltage sensors for Air 8, 8 USB port sub-devices for MASS2). Other ISDT devices using the same BLE protocol may also work — feedback and reports are welcome.
 
 ## Features
 
