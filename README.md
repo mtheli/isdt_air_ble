@@ -18,14 +18,14 @@ A matching dashboard card is available: **[ISDT Charger Card](https://github.com
 
 ## Supported Devices
 
-> **Note:** This integration has been tested with the **ISDT C4 Air**, **ISDT A8 Air** (round-cell chargers), and the **ISDT MASS2** (USB power adapter). Support for the **Air 8** and **K2 Air** (LiPo balance chargers) was added in v0.9.0 / v0.9.1 and is currently being validated by community testers. Other ISDT devices with BLE support may work but are untested.
+> **Note:** This integration has been tested with the **ISDT C4 Air**, **ISDT A8 Air** (round-cell chargers), the **ISDT MASS2** (USB power adapter), and the **ISDT Air 8** (LiPo balance charger). Support for the **K2 Air** was added in v0.9.1 and is currently being validated by a community tester. Other ISDT devices with BLE support may work but are untested.
 
 | Model | Type | Status |
 |-------|------|--------|
 | ISDT C4 Air | 6-Channel Round-Cell Charger | Tested ✓ ([@mtheli](https://github.com/mtheli)) |
 | ISDT A8 Air | 8-Channel Round-Cell Charger | Tested ✓ ([@stuartp44](https://github.com/stuartp44)) |
 | ISDT MASS2 | USB Adapter | Tested ✓ ([@mtheli](https://github.com/mtheli)) |
-| ISDT Air 8 | 1S–8S LiPo Balance Charger (single channel, 8 A) | Testing in progress ([@TRES9000](https://github.com/TRES9000), issue #2) |
+| ISDT Air 8 | 1S–8S LiPo Balance Charger (single channel, 8 A) | Tested ✓ ([@TRES9000](https://github.com/TRES9000), 6S pack, issue #2) |
 | ISDT K2 Air | Dual-Channel LiPo Balance Charger (2 × 1S–6S, 20 A per channel) | Testing in progress ([@Mngnt](https://github.com/Mngnt), issue #3) |
 | ISDT NP2 Air | Charger | Untested |
 | ISDT LP2 Air | Charger | Untested |
