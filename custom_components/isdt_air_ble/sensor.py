@@ -18,7 +18,13 @@ from homeassistant.const import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, DeviceType, MASS2_PORT_COUNT, MASS2_PORT_LABELS
+from .const import (
+    DOMAIN,
+    DeviceType,
+    MASS2_PORT_COUNT,
+    MASS2_PORT_LABELS,
+    supports_cell_voltages,
+)
 from .helpers import main_device_info, slot_device_info, port_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,8 +51,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 def _setup_charger_sensors(coordinator, entities):
     """Set up sensors for charger devices (C4 Air, A8 Air, etc.)."""
-    is_a8_air = "A8" in coordinator.model.upper()
-
     entities.extend(
         [
             ISDTC4VoltageSensor(
@@ -137,7 +141,7 @@ def _setup_charger_sensors(coordinator, entities):
         )
 
         # A8 Air doesn't support individual cell voltage monitoring
-        if not is_a8_air:
+        if supports_cell_voltages(coordinator.model):
             for cell_idx in range(16):
                 entities.append(
                     ISDTC4CellVoltageSensor(

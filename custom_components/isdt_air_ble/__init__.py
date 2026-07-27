@@ -6,6 +6,7 @@ from homeassistant.components.bluetooth import async_last_service_info
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .const import (
     CONF_BIND_UUID,
@@ -18,8 +19,12 @@ from .const import (
     DEFAULT_PHANTOM_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    DeviceType,
     ISDT_MANUFACTURER_ID,
     detect_model_from_mfg_data,
+    get_channel_count,
+    get_device_type,
+    is_stale_charger_unique_id,
 )
 from .coordinator import ISDTDataUpdateCoordinator
 
@@ -86,6 +91,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
+    _async_cleanup_stale_registry(hass, entry, address, model)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Start persistent connection loop in the background
@@ -99,6 +106,52 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload the entry when options change."""
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+def _async_cleanup_stale_registry(
+    hass: HomeAssistant, entry: ConfigEntry, address: str, model: str
+) -> None:
+    """Remove registry ghosts left behind by earlier model (mis)detection.
+
+    Before a device's model was known — or supported at all — setup fell
+    back to a generic 6-channel charger profile and registered entities
+    (notably the disabled-by-default cell-voltage sensors) that the real
+    device never provides. Entity-registry entries outlive the code that
+    created them, so prune anything the current model cannot have.
+    """
+    if get_device_type(model) != DeviceType.CHARGER:
+        return
+
+    channel_count = get_channel_count(model)
+
+    ent_reg = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
+        if is_stale_charger_unique_id(
+            entity.unique_id, address, model, channel_count
+        ):
+            _LOGGER.debug(
+                "Removing stale entity %s (unique_id=%s) not provided by %s",
+                entity.entity_id,
+                entity.unique_id,
+                model,
+            )
+            ent_reg.async_remove(entity.entity_id)
+
+    # Slot sub-devices beyond the model's slot count (their entities were
+    # just removed above, but empty devices linger in the registry).
+    dev_reg = dr.async_get(hass)
+    for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
+        for domain, identifier in device.identifiers:
+            if domain != DOMAIN or not identifier.startswith(f"{address}_slot"):
+                continue
+            slot_str = identifier.removeprefix(f"{address}_slot")
+            if slot_str.isdigit() and int(slot_str) > channel_count:
+                _LOGGER.debug(
+                    "Removing stale slot device %s (%s)", device.name, identifier
+                )
+                dev_reg.async_update_device(
+                    device.id, remove_config_entry_id=entry.entry_id
+                )
 
 
 def _detect_model_from_cache(hass: HomeAssistant, address: str) -> str | None:

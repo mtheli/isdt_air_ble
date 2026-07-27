@@ -215,6 +215,53 @@ def get_channel_count(model: str) -> int:
     return MODEL_CHANNEL_COUNT_MAP.get(model, 6)
 
 
+def supports_cell_voltages(model: str) -> bool:
+    """Whether a charger reports per-cell voltages.
+
+    The A8 Air charges single round cells per slot and has no balance
+    leads, so it never produces cell-voltage data.
+    """
+    return "A8" not in model.upper()
+
+
+_CHANNEL_UID_RE = re.compile(r"ch(\d+)_(.+)$")
+_SLOT_UID_RE = re.compile(r"slot(\d+)_")
+_CELL_KEY_RE = re.compile(r"cell\d+$")
+
+
+def is_stale_charger_unique_id(
+    unique_id: str, address: str, model: str, channel_count: int
+) -> bool:
+    """Whether an entity-registry unique_id is stale for this charger.
+
+    Entities can outlive the code that created them: before a model is
+    known (or before it was supported at all) the integration falls back
+    to a generic 6-channel charger profile, registering entities the real
+    device never provides. Those registry entries stick around as
+    permanently disabled/unavailable ghosts, so setup prunes:
+
+    - per-channel entities on channels the model doesn't have,
+    - per-slot entities on slots the model doesn't have,
+    - cell-voltage entities on models without per-cell data.
+    """
+    prefix = f"{address}_"
+    if not unique_id.startswith(prefix):
+        return False
+    rest = unique_id[len(prefix):]
+
+    m = _CHANNEL_UID_RE.match(rest)
+    if m:
+        if int(m.group(1)) >= channel_count:
+            return True
+        return bool(_CELL_KEY_RE.fullmatch(m.group(2))) and not supports_cell_voltages(model)
+
+    m = _SLOT_UID_RE.match(rest)
+    if m:
+        return int(m.group(1)) > channel_count
+
+    return False
+
+
 # ---------------------------------------------------------------------------
 # MASS2 adapter commands (written to CHAR_UUID_AF01)
 # ---------------------------------------------------------------------------
