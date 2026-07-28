@@ -20,6 +20,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    AdapterProtocol,
     BIND_RESULT_OK,
     BIND_RESULT_WAITING,
     BIND_STATUS,
@@ -33,6 +34,8 @@ from .const import (
     CMD_IR_REQ,
     CMD_MASS2_SETTINGS_REQ,
     CMD_MASS2_WORK_STATUS_REQ,
+    CMD_PS200_DC_STATUS_REQ,
+    CMD_PS200_WORK_STATUS_REQ,
     CMD_WORKSTATE_REQ,
     CONF_PHANTOM_DEBOUNCE,
     CONF_PHANTOM_SUSTAIN,
@@ -44,9 +47,15 @@ from .const import (
     DeviceType,
     MASS2_FRAME_HEADER,
     MASS2_PORT_COUNT,
+    PS200_DC_STATUS_CHANNEL_SIZE,
+    PS200_WORK_STATUS_CHANNEL_SIZE,
+    RESP_ALARM_TONE,
     RESP_BIND,
     RESP_MASS2_SETTINGS,
     RESP_MASS2_WORK_STATUS,
+    RESP_PS200_DC_STATUS,
+    RESP_PS200_WORK_STATUS,
+    get_adapter_protocol,
     get_channel_count,
     get_device_type,
 )
@@ -56,6 +65,7 @@ from .parser import (
     parse_charger_responses,
     parse_hardware_info,
     parse_mass2_responses,
+    parse_ps200_responses,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -102,11 +112,18 @@ def _build_charger_command_list(num_channels: int = 6) -> list[bytearray]:
     return commands
 
 
-def _build_adapter_command_list() -> list[bytearray]:
-    """Build the circular command list for adapter devices (MASS2).
+def _build_adapter_command_list(protocol: AdapterProtocol) -> list[bytearray]:
+    """Build the circular command list for adapter devices.
 
-    Single command: WorkStatusReq polls all 8 ports at once.
+    MASS2: a single WorkStatusReq polls all 8 ports at once.
+    PS200: WorkingStatusReq (all channels) + DCStatusReq + AlarmToneReq.
     """
+    if protocol == AdapterProtocol.PS200:
+        return [
+            CMD_PS200_WORK_STATUS_REQ,
+            CMD_PS200_DC_STATUS_REQ,
+            CMD_ALARM_TONE_REQ,
+        ]
     return [CMD_MASS2_WORK_STATUS_REQ]
 
 
@@ -133,6 +150,11 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         self.address = address
         self.model = model
         self.device_type = get_device_type(model)
+        self.adapter_protocol = (
+            get_adapter_protocol(model)
+            if self.device_type == DeviceType.ADAPTER
+            else None
+        )
         self.channel_count = get_channel_count(model) if self.device_type == DeviceType.CHARGER else 0
         self.scan_interval_seconds = scan_interval
         self.phantom_threshold = phantom_threshold
@@ -178,9 +200,12 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         self._connection_lock = asyncio.Lock()
         self._live_task: asyncio.Task | None = None
 
+        # Cached PS200 DC connector status (Power 200 family)
+        self._ps200_dc: dict | None = None
+
         # Circular command list (device-type-specific)
         if self.device_type == DeviceType.ADAPTER:
-            self._commands = _build_adapter_command_list()
+            self._commands = _build_adapter_command_list(self.adapter_protocol)
         else:
             self._commands = _build_charger_command_list(self.channel_count)
 
@@ -205,6 +230,11 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
     def mass2_settings(self) -> dict | None:
         """Return cached MASS2 device settings (adapter only)."""
         return self._mass2_settings
+
+    @property
+    def ps200_dc(self) -> dict | None:
+        """Return cached PS200 DC connector status (Power 200 family)."""
+        return self._ps200_dc
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -320,11 +350,15 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                             break
 
                 # Send next command in the cycle. For adapters, clear the
-                # reassembly buffer first so a stale partial frame from the
-                # previous cycle cannot drift into the new response (would
-                # otherwise mis-align port data when a notification was
-                # dropped — the 0x31 resync byte also occurs inside payloads).
-                if self.device_type == DeviceType.ADAPTER:
+                # reassembly buffer at the start of each cycle so a stale
+                # partial frame from the previous cycle cannot drift into
+                # the new response (would otherwise mis-align port data
+                # when a notification was dropped — the 0x31 resync byte
+                # also occurs inside payloads). Only at cycle start, not
+                # before every command: PS200 cycles poll several commands
+                # and a response may still be reassembling when the next
+                # command goes out.
+                if self.device_type == DeviceType.ADAPTER and cmd_index == 0:
                     self._mass2_buffer.clear()
 
                 cmd = self._commands[cmd_index]
@@ -381,7 +415,18 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
 
         # Parsing response (device-type-specific)
         _LOGGER.debug("Received %d responses", len(responses))
-        if self.device_type == DeviceType.ADAPTER:
+        if self.adapter_protocol == AdapterProtocol.PS200:
+            parsed_ports, parsed_dc, alarm_tone_on = parse_ps200_responses(responses)
+            if parsed_dc is not None:
+                self._ps200_dc = parsed_dc
+            if alarm_tone_on is not None:
+                self._alarm_tone_on = alarm_tone_on
+            if parsed_ports is None:
+                # No complete WorkingStatus response — keep existing data.
+                return
+            self._apply_phantom_filter(parsed_ports)
+            parsed = parsed_ports
+        elif self.device_type == DeviceType.ADAPTER:
             parsed_ports, parsed_settings = parse_mass2_responses(responses)
             if parsed_settings is not None:
                 self._mass2_settings = parsed_settings
@@ -551,7 +596,13 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 for ch in parsed_ports.values()
                 if isinstance(ch, dict)
             )
-            parsed_ports["_total_power"] = round(filtered_total)
+            # MASS2 reports the total with 1 W resolution; PS200 totals
+            # are computed from mW-resolution per-port values.
+            parsed_ports["_total_power"] = (
+                round(filtered_total, 1)
+                if self.adapter_protocol == AdapterProtocol.PS200
+                else round(filtered_total)
+            )
 
     @staticmethod
     def _mask_port_as_off(ch: dict) -> None:
@@ -620,7 +671,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             # The response (cmd 0xCB) will be picked up by the notification
             # handler and stored in self._mass2_settings.
             if (
-                self.device_type == DeviceType.ADAPTER
+                self.adapter_protocol == AdapterProtocol.MASS2
                 and not self._mass2_settings_requested
             ):
                 _LOGGER.debug("Sending MASS2 SettingsReq")
@@ -633,7 +684,8 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             # schedules and alarm clocks fire at the correct times even
             # when no other client has connected recently. The device
             # protocol expects a time-sync on every successful connect.
-            if self.device_type == DeviceType.ADAPTER:
+            # PS200 devices have no schedules and no SetTime command.
+            if self.adapter_protocol == AdapterProtocol.MASS2:
                 await self._send_mass2_set_time()
 
         except Exception as err:
@@ -737,11 +789,40 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 # openingTime[2], closingTime[2], 4 × (switchRepeatDay,
                 # openingTime[2]) = 21 bytes
                 expected = 21
+            elif cmd == RESP_PS200_WORK_STATUS:
+                # PS200 WorkingStatus: channel count in byte 2, then a
+                # 4-byte timestamp and 34 bytes per channel.
+                total_channels = self._mass2_buffer[2]
+                if not 1 <= total_channels <= 8:
+                    _LOGGER.debug(
+                        "Implausible PS200 channel count %d, skipping frame",
+                        total_channels,
+                    )
+                    del self._mass2_buffer[0]
+                    continue
+                expected = 7 + total_channels * PS200_WORK_STATUS_CHANNEL_SIZE
+            elif cmd == RESP_PS200_DC_STATUS:
+                # PS200 DCStatus: 4-byte timestamp first, channel count in
+                # byte 6, then 22 bytes per channel.
+                if len(self._mass2_buffer) < 7:
+                    return  # need more data to know the length
+                total_channels = self._mass2_buffer[6]
+                if not 1 <= total_channels <= 4:
+                    _LOGGER.debug(
+                        "Implausible PS200 DC channel count %d, skipping frame",
+                        total_channels,
+                    )
+                    del self._mass2_buffer[0]
+                    continue
+                expected = 7 + total_channels * PS200_DC_STATUS_CHANNEL_SIZE
+            elif cmd == RESP_ALARM_TONE:
+                # AlarmToneResp: frame header, cmd word, state byte.
+                expected = 3
             else:
                 # Unknown cmd word. We don't know the length, so log and
                 # try to find the next frame header.
                 _LOGGER.debug(
-                    "Unknown MASS2 cmd 0x%02x, skipping frame", cmd,
+                    "Unknown adapter cmd 0x%02x, skipping frame", cmd,
                 )
                 del self._mass2_buffer[0]
                 continue

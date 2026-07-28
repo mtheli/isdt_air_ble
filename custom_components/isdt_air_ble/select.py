@@ -5,7 +5,7 @@ import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, DeviceType
+from .const import DOMAIN, AdapterProtocol
 from .helpers import main_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,7 +16,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
     entities = []
-    if coordinator.device_type == DeviceType.ADAPTER:
+    # Volume control is a MASS2 settings feature; PS200 adapters only
+    # have the plain alarm-tone switch.
+    if coordinator.adapter_protocol == AdapterProtocol.MASS2:
         entities.append(ISDTMASS2VolumeSelect(coordinator))
 
     async_add_entities(entities)

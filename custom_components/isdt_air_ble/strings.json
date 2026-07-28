@@ -133,8 +133,19 @@
         "state": {
           "none": "None",
           "pd": "USB PD",
-          "fast_charge": "Fast Charge"
+          "fast_charge": "Fast Charge",
+          "other": "Other",
+          "qc2": "QC 2.0",
+          "qc3": "QC 3.0",
+          "pd2": "USB PD 2.0",
+          "pd3": "USB PD 3.0"
         }
+      },
+      "port_energy": {
+        "name": "Session energy"
+      },
+      "phone_battery": {
+        "name": "Phone battery"
       },
       "total_power": {
         "name": "Total Power"

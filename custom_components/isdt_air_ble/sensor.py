@@ -20,9 +20,10 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     DOMAIN,
+    AdapterProtocol,
     DeviceType,
-    MASS2_PORT_COUNT,
-    MASS2_PORT_LABELS,
+    get_port_count,
+    get_port_labels,
     supports_cell_voltages,
 )
 from .helpers import main_device_info, slot_device_info, port_device_info
@@ -155,8 +156,10 @@ def _setup_charger_sensors(coordinator, entities):
 
 
 def _setup_adapter_sensors(coordinator, entities):
-    """Set up sensors for adapter devices (MASS2)."""
-    for port in range(MASS2_PORT_COUNT):
+    """Set up sensors for adapter devices (MASS2, Power 200 family)."""
+    is_ps200 = coordinator.adapter_protocol == AdapterProtocol.PS200
+
+    for port in range(get_port_count(coordinator.model)):
         port_num = port + 1
         # Per-port detail sensors → port sub-device
         entities.extend(
@@ -164,11 +167,20 @@ def _setup_adapter_sensors(coordinator, entities):
                 ISDTMASS2VoltageSensor(coordinator, port, port_num),
                 ISDTMASS2CurrentSensor(coordinator, port, port_num),
                 ISDTMASS2PowerSensor(coordinator, port, port_num),
-                ISDTMASS2ProtocolSensor(coordinator, port, port_num),
             ]
         )
+        if is_ps200:
+            entities.append(ISDTPS200ProtocolSensor(coordinator, port, port_num))
+            entities.append(ISDTPS200EnergySensor(coordinator, port, port_num))
+        else:
+            entities.append(ISDTMASS2ProtocolSensor(coordinator, port, port_num))
         # Port status overview → main device
         entities.append(ISDTMASS2PortStatusSensor(coordinator, port, port_num))
+
+    if is_ps200:
+        # The wireless pad (channel 0) reports the phone's battery level
+        # for brands that expose it via the wireless-charging handshake.
+        entities.append(ISDTPS200PhoneBatterySensor(coordinator))
 
     entities.append(ISDTMASS2TotalPowerSensor(coordinator))
 
@@ -568,6 +580,55 @@ class ISDTMASS2ProtocolSensor(ISDTMASS2SensorBase):
         super().__init__(coordinator, "port_protocol", "protocol_str", channel, port_num)
 
 
+class ISDTPS200ProtocolSensor(ISDTMASS2SensorBase):
+    """Per-port fast-charge protocol sensor for the Power 200 family."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["none", "other", "qc2", "qc3", "pd2", "pd3"]
+    _attr_icon = "mdi:lightning-bolt"
+
+    def __init__(self, coordinator, channel, port_num):
+        super().__init__(coordinator, "port_protocol", "protocol_str", channel, port_num)
+
+
+class ISDTPS200EnergySensor(ISDTMASS2SensorBase):
+    """Per-port session energy sensor (Wh, resets when a device is unplugged)."""
+
+    _attr_native_unit_of_measurement = UnitOfEnergy.WATT_HOUR
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, coordinator, channel, port_num):
+        super().__init__(coordinator, "port_energy", "energy_wh", channel, port_num)
+
+
+class ISDTPS200PhoneBatterySensor(ISDTMASS2SensorBase):
+    """Battery level of the phone on the wireless pad (channel 0).
+
+    Only some brands report their battery level through the
+    wireless-charging handshake; the sensor is unavailable otherwise.
+    """
+
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator):
+        super().__init__(coordinator, "phone_battery", "phone_battery", 0, 1)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
+
+    @property
+    def extra_state_attributes(self):
+        if not self.coordinator.data or 0 not in self.coordinator.data:
+            return None
+        brand = self.coordinator.data[0].get("phone_brand")
+        return {"phone_brand": brand} if brand else None
+
+
 class ISDTMASS2PortStatusSensor(CoordinatorEntity, SensorEntity):
     """Per-port status sensor on the main device (overview).
 
@@ -589,7 +650,8 @@ class ISDTMASS2PortStatusSensor(CoordinatorEntity, SensorEntity):
         address = coordinator.address
         model = coordinator.model
 
-        label = MASS2_PORT_LABELS[port_num - 1] if 1 <= port_num <= len(MASS2_PORT_LABELS) else f"Port {port_num}"
+        labels = get_port_labels(model)
+        label = labels[port_num - 1] if 1 <= port_num <= len(labels) else f"Port {port_num}"
         self._attr_unique_id = f"{address}_port{port_num}_status"
         self._attr_translation_placeholders = {"port": label}
         self._attr_device_info = main_device_info(address, model)

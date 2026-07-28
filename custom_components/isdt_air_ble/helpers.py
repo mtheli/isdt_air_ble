@@ -5,7 +5,7 @@ from homeassistant.helpers.device_registry import (
     CONNECTION_BLUETOOTH,
 )
 
-from .const import DOMAIN, MASS2_PORT_LABELS
+from .const import DOMAIN, get_port_labels
 
 
 def main_device_info(address: str, model: str = "C4 Air") -> DeviceInfo:
@@ -31,13 +31,15 @@ def slot_device_info(address: str, slot: int, model: str = "C4 Air") -> DeviceIn
 
 
 def port_device_info(address: str, port: int, model: str = "MASS2") -> DeviceInfo:
-    """Device info for a USB port sub-device.
+    """Device info for an output port sub-device.
 
-    Uses the physical USB port label (USB-C1...USB-A2) when available,
-    matching the port labelling on the device hardware.
+    Uses the model's physical port label (USB-C1...USB-A2 on the MASS2,
+    Wireless/USB-A/USB-C1..C3 on the Power 200 family), matching the
+    port labelling on the device hardware.
     """
-    if 1 <= port <= len(MASS2_PORT_LABELS):
-        label = MASS2_PORT_LABELS[port - 1]
+    labels = get_port_labels(model)
+    if 1 <= port <= len(labels):
+        label = labels[port - 1]
     else:
         label = f"Port {port}"
     return DeviceInfo(

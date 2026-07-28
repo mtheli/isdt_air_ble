@@ -10,6 +10,8 @@ from .const import (
     RESP_IR,
     RESP_MASS2_SETTINGS,
     RESP_MASS2_WORK_STATUS,
+    RESP_PS200_DC_STATUS,
+    RESP_PS200_WORK_STATUS,
     WORK_STATE_MAP,
     BATTERY_TYPE_MAP,
     AIR8_WORK_STATE_MAP,
@@ -17,6 +19,11 @@ from .const import (
     BALANCE_CHARGER_MODELS,
     MASS2_PORT_COUNT,
     MASS2_PROTOCOL_MAP,
+    PS200_DC_STATUS_CHANNEL_SIZE,
+    PS200_PHONE_BRANDS,
+    PS200_PORT_COUNT,
+    PS200_PROTOCOL_MAP,
+    PS200_WORK_STATUS_CHANNEL_SIZE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -611,6 +618,195 @@ def _parse_mass2_settings(data: bytes) -> dict | None:
         settings["operationSoundRepeatDay"],
     )
     return settings
+
+
+# ---------------------------------------------------------------------------
+# PS200 adapter parsing (Power 200 / 200H / 200X)
+# ---------------------------------------------------------------------------
+
+
+def parse_ps200_responses(
+    responses: list[bytes],
+) -> tuple[dict | None, dict | None, bool | None]:
+    """Parse PS200 BLE notification responses.
+
+    Returns:
+        (ports, dc, alarm_tone_on)
+        ports: dict {channel (int): {key: value, ...}} when at least one
+               valid WorkingStatusResp was parsed; None otherwise.
+               Channel 0 is the wireless pad, channels 1+ the USB ports.
+        dc:    dict with DC connector status when a DCStatusResp was
+               parsed; None otherwise.
+        alarm_tone_on: bool | None
+    """
+    ports: dict = {p: {} for p in range(PS200_PORT_COUNT)}
+    ports_valid = False
+    dc: dict | None = None
+    alarm_tone_on = None
+
+    for raw in responses:
+        _LOGGER.debug("RAW BLE DATA from PS200 (%d bytes): %s", len(raw), raw.hex(" "))
+
+        if len(raw) < 3:
+            continue
+
+        cmd = raw[1]
+
+        if cmd == RESP_PS200_WORK_STATUS:
+            if _parse_ps200_work_status(raw, ports):
+                ports_valid = True
+        elif cmd == RESP_PS200_DC_STATUS:
+            parsed_dc = _parse_ps200_dc_status(raw)
+            if parsed_dc is not None:
+                dc = parsed_dc
+        elif cmd == RESP_ALARM_TONE:
+            alarm_tone_on = raw[2] != 0
+        else:
+            _LOGGER.debug("Unknown PS200 CMD 0x%02x: %s", cmd, raw.hex(" "))
+
+    return (ports if ports_valid else None, dc, alarm_tone_on)
+
+
+def _parse_ps200_work_status(data: bytes, parsed: dict) -> bool:
+    """Parse PS200WorkingStatusResp (CMD 0x95).
+
+    Format (verified against PS200WorkingStatusResp.parse):
+      Byte 0: 0x31 frame header
+      Byte 1: 0x95 cmd word
+      Byte 2: total channels
+      Bytes 3-6: timestamp (uint32 LE)
+      Per channel (34 bytes each, starting at byte 7):
+        +0:  channel_id (uint8)
+        +1:  valid_id (int8) — |value| == 1 means the port is active
+        +2:  channel_type (uint8)
+        +3:  fast_charge_protocol (uint8, see PS200_PROTOCOL_MAP)
+        +4:  reserve (uint8) — phone battery %, wireless pad only
+        +5:  reserve1 (int8) — phone brand index, wireless pad only
+        +6-9:   output_voltage (uint32 LE, mV)
+        +10-13: output_current (uint32 LE, mA)
+        +14-17: output_power (uint32 LE, mW)
+        +18-21: maximum_power (uint32 LE, mW)
+        +22-25: current_power (uint32 LE)
+        +26-29: work_time (uint32 LE, s)
+        +30-33: energy (uint32 LE, mWh, session total)
+    """
+    if len(data) < 7:
+        _LOGGER.warning("PS200 WorkStatus response too short: %d bytes", len(data))
+        return False
+
+    total_channels = data[2]
+    expected_len = 7 + total_channels * PS200_WORK_STATUS_CHANNEL_SIZE
+
+    if not 1 <= total_channels <= 8 or len(data) < expected_len:
+        _LOGGER.warning(
+            "Incomplete PS200 WorkStatus response: %d bytes (need %d for %d channels)",
+            len(data), expected_len, total_channels,
+        )
+        return False
+
+    pos = 7
+    for _ in range(total_channels):
+        ch = data[pos]
+        if ch not in parsed:
+            parsed[ch] = {}
+
+        valid_id = int.from_bytes(data[pos + 1 : pos + 2], "little", signed=True)
+        protocol = data[pos + 3]
+        phone_battery = data[pos + 4]
+        phone_brand = data[pos + 5]
+        voltage = int.from_bytes(data[pos + 6 : pos + 10], "little") / 1000.0
+        current = int.from_bytes(data[pos + 10 : pos + 14], "little") / 1000.0
+        power = int.from_bytes(data[pos + 14 : pos + 18], "little") / 1000.0
+        max_power = int.from_bytes(data[pos + 18 : pos + 22], "little") / 1000.0
+        work_time = int.from_bytes(data[pos + 26 : pos + 30], "little")
+        energy_mwh = int.from_bytes(data[pos + 30 : pos + 34], "little")
+
+        parsed[ch].update({
+            "status": 1 if abs(valid_id) == 1 else 0,
+            "protocol": protocol,
+            "protocol_str": PS200_PROTOCOL_MAP.get(protocol, "none"),
+            "voltage": voltage,
+            "current": current,
+            "power": round(power, 2),
+            "max_power": round(max_power, 1),
+            "work_time": work_time,
+            "energy_wh": energy_mwh / 1000.0,
+        })
+
+        # Wireless pad only: phone brand + battery level from the
+        # wireless-charging handshake (0 = unknown/none).
+        if ch == 0:
+            brand = PS200_PHONE_BRANDS.get(phone_brand)
+            parsed[ch]["phone_brand"] = brand
+            parsed[ch]["phone_battery"] = (
+                phone_battery if brand and 0 < phone_battery <= 100 else None
+            )
+
+        pos += PS200_WORK_STATUS_CHANNEL_SIZE
+
+    # Device-level total: sum of the per-port power readings of active
+    # ports (matches the total the manufacturer app displays).
+    parsed["_total_power"] = round(
+        sum(
+            ch.get("power") or 0.0
+            for key, ch in parsed.items()
+            if isinstance(key, int) and isinstance(ch, dict) and ch.get("status") == 1
+        ),
+        1,
+    )
+
+    _LOGGER.debug("PS200 WorkStatus parsed (%d channels)", total_channels)
+    return True
+
+
+def _parse_ps200_dc_status(data: bytes) -> dict | None:
+    """Parse PS200DCStatusResp (CMD 0x97).
+
+    Format (verified against PS200DCStatusResp.parse):
+      Byte 0: 0x31 frame header
+      Byte 1: 0x97 cmd word
+      Bytes 2-5: timestamp (uint32 LE)
+      Byte 6: total channels
+      Per channel (22 bytes each, starting at byte 7):
+        +0:  channel_type (uint8)
+        +1:  valid_id (uint8)
+        +2-5:   voltage (int32 LE, mV — negative while the DC jack is
+                acting as an input)
+        +6-9:   current (int32 LE, mA)
+        +10-13: maximum_power (int32 LE)
+        +14-17: current_power (int32 LE)
+        +18-21: current_set_power (int32 LE)
+    """
+    if len(data) < 7:
+        _LOGGER.warning("PS200 DCStatus response too short: %d bytes", len(data))
+        return None
+
+    total_channels = data[6]
+    expected_len = 7 + total_channels * PS200_DC_STATUS_CHANNEL_SIZE
+
+    if not 1 <= total_channels <= 4 or len(data) < expected_len:
+        _LOGGER.warning(
+            "Incomplete PS200 DCStatus response: %d bytes (need %d for %d channels)",
+            len(data), expected_len, total_channels,
+        )
+        return None
+
+    channels = []
+    pos = 7
+    for _ in range(total_channels):
+        voltage_mv = int.from_bytes(data[pos + 2 : pos + 6], "little", signed=True)
+        current_ma = int.from_bytes(data[pos + 6 : pos + 10], "little", signed=True)
+        channels.append({
+            "channel_type": data[pos],
+            "valid_id": data[pos + 1],
+            "voltage": voltage_mv / 1000.0,
+            "current": current_ma / 1000.0,
+            "is_input": voltage_mv < 0,
+        })
+        pos += PS200_DC_STATUS_CHANNEL_SIZE
+
+    _LOGGER.debug("PS200 DCStatus parsed (%d channels): %s", total_channels, channels)
+    return {"channels": channels}
 
 
 def build_mass2_settings_set_req(settings: dict) -> bytearray:

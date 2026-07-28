@@ -118,11 +118,17 @@ def _async_cleanup_stale_registry(
     (notably the disabled-by-default cell-voltage sensors) that the real
     device never provides. Entity-registry entries outlive the code that
     created them, so prune anything the current model cannot have.
-    """
-    if get_device_type(model) != DeviceType.CHARGER:
-        return
 
-    channel_count = get_channel_count(model)
+    This also applies to adapters: a Power 200 added before its model was
+    supported went through the same charger fallback, so charger-style
+    channel/slot ghosts are pruned there too (channel_count 0 = the model
+    has no charger channels at all).
+    """
+    channel_count = (
+        get_channel_count(model)
+        if get_device_type(model) == DeviceType.CHARGER
+        else 0
+    )
 
     ent_reg = er.async_get(hass)
     for entity in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
