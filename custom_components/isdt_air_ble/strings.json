@@ -12,7 +12,7 @@
       },
       "pair": {
         "title": "Pair with {model}",
-        "description": "Click Submit, then **press any button on the device** to confirm pairing.\n\nSome devices (like the MASS2) will beep; others just wait silently. You have 30 seconds to press a button after clicking Submit."
+        "description": "Click Submit to start pairing.\n\nIf your device beeps and asks for confirmation (like the MASS2), **press any button on it within 30 seconds**. Devices without buttons (like the C4 Air or Power 200) accept the pairing automatically — no action needed."
       },
       "show_device_info": {
         "title": "Device Info",
@@ -21,7 +21,7 @@
     },
     "error": {
       "cannot_connect": "Failed to connect to the device. Ensure it is powered on and in range.",
-      "pairing_failed": "Pairing timed out. Please try again and press any button on the device within 30 seconds."
+      "pairing_failed": "Pairing timed out. If your device has buttons, try again and press any button within 30 seconds. Otherwise make sure the device is powered on, in range and not connected to the ISDT app."
     },
     "abort": {
       "already_configured": "Device is already configured.",
