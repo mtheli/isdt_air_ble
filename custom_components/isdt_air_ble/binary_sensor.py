@@ -8,7 +8,7 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, DeviceType, MASS2_PORT_COUNT
+from .const import DOMAIN, DeviceType, get_port_count
 from .helpers import main_device_info, slot_device_info, port_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     ]
 
     if coordinator.device_type == DeviceType.ADAPTER:
-        for port in range(MASS2_PORT_COUNT):
+        for port in range(get_port_count(coordinator.model)):
             port_num = port + 1
             entities.append(ISDTMASS2PortActiveSensor(coordinator, port_num, port))
     else:

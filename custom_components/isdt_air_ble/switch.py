@@ -5,7 +5,7 @@ import logging
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, DeviceType
+from .const import DOMAIN, AdapterProtocol, DeviceType
 from .helpers import main_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -20,6 +20,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
         # A8 Air doesn't have alarm tone functionality
         if "A8" not in coordinator.model.upper():
             entities.append(ISDTC4AlarmToneSwitch(coordinator))
+    elif coordinator.adapter_protocol == AdapterProtocol.PS200:
+        # PS200 adapters use the charger-style alarm-tone command
+        entities.append(ISDTC4AlarmToneSwitch(coordinator))
     elif coordinator.device_type == DeviceType.ADAPTER:
         entities.append(ISDTMASS2BeepSwitch(coordinator))
 

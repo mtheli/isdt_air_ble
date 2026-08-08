@@ -10,6 +10,28 @@ class DeviceType(StrEnum):
     CHARGER = "charger"
     ADAPTER = "adapter"
 
+
+class AdapterProtocol(StrEnum):
+    """Wire protocol spoken by an adapter device.
+
+    Adapters share the transport layer (0x31 frame header, bind handshake,
+    hardware-info query) but use different status commands:
+      - MASS2:  WorkStatusReq 0xC2 → 0xC3, fixed 8-port frame
+      - PS200:  WorkStatusReq 0x94 → 0x95, variable channel count in the
+                frame itself (Power 200 family)
+    """
+
+    MASS2 = "mass2"
+    PS200 = "ps200"
+
+
+class ChargeSessionAction(StrEnum):
+    """What the "Charging Since" sensor should do with its latched start time."""
+
+    CLEAR = "clear"    # no battery / not charging — report nothing
+    ANCHOR = "anchor"  # (re)compute the start time from the device counter
+    KEEP = "keep"      # keep the timestamp already latched for this session
+
 # Options
 CONF_SCAN_INTERVAL = "scan_interval"
 DEFAULT_SCAN_INTERVAL = 5  # seconds
@@ -164,6 +186,8 @@ DEVICE_MODEL_MAP = {
     "01060000": "K4",
     "01070000": "C4 Air",
     "01080000": "Power 200",
+    "010d0000": "Power 200H",
+    "010e0000": "Power 200X",
     "010f00a8": "A8 Air",
     "01100000": "PB70W",
     "01100001": "PB70W",
@@ -184,6 +208,16 @@ DEVICE_MODEL_MAP = {
 # Map model names to device types
 MODEL_DEVICE_TYPE_MAP: dict[str, DeviceType] = {
     "MASS2": DeviceType.ADAPTER,
+    "Power 200": DeviceType.ADAPTER,
+    "Power 200H": DeviceType.ADAPTER,
+    "Power 200X": DeviceType.ADAPTER,
+}
+
+# Map adapter model names to their wire protocol (default: MASS2)
+MODEL_ADAPTER_PROTOCOL_MAP: dict[str, AdapterProtocol] = {
+    "Power 200": AdapterProtocol.PS200,
+    "Power 200H": AdapterProtocol.PS200,
+    "Power 200X": AdapterProtocol.PS200,
 }
 
 # Map model names to channel/slot counts
@@ -204,10 +238,37 @@ MASS2_PORT_LABELS = [
     "USB-C5", "USB-C6", "USB-A1", "USB-A2",
 ]
 
+PS200_PORT_COUNT = 5
+
+# Power 200 channel layout: channel 0 is the wireless charging pad,
+# channels 1-4 are the USB ports (order per Power200Base.USBName).
+PS200_PORT_LABELS = [
+    "Wireless", "USB-A", "USB-C1", "USB-C2", "USB-C3",
+]
+
 
 def get_device_type(model: str) -> DeviceType:
     """Get device type for a model name. Defaults to CHARGER."""
     return MODEL_DEVICE_TYPE_MAP.get(model, DeviceType.CHARGER)
+
+
+def get_adapter_protocol(model: str) -> AdapterProtocol:
+    """Get the wire protocol for an adapter model. Defaults to MASS2."""
+    return MODEL_ADAPTER_PROTOCOL_MAP.get(model, AdapterProtocol.MASS2)
+
+
+def get_port_count(model: str) -> int:
+    """Get the number of output ports for an adapter model."""
+    if get_adapter_protocol(model) == AdapterProtocol.PS200:
+        return PS200_PORT_COUNT
+    return MASS2_PORT_COUNT
+
+
+def get_port_labels(model: str) -> list[str]:
+    """Get the physical port labels for an adapter model."""
+    if get_adapter_protocol(model) == AdapterProtocol.PS200:
+        return PS200_PORT_LABELS
+    return MASS2_PORT_LABELS
 
 
 def get_channel_count(model: str) -> int:
@@ -222,6 +283,39 @@ def supports_cell_voltages(model: str) -> bool:
     leads, so it never produces cell-voltage data.
     """
     return "A8" not in model.upper()
+
+
+def charge_session_action(
+    work_state: str,
+    work_period: int,
+    last_work_period: int,
+    has_anchor: bool,
+) -> ChargeSessionAction:
+    """Decide how the "Charging Since" timestamp reacts to a poll.
+
+    The start of a charge is derived as ``now - work_period``, but neither
+    side of that subtraction is stable: ``now`` carries microseconds, so
+    recomputing it on every poll wrote a new state every couple of seconds,
+    and the device's own counter does not advance in lockstep with
+    wall-clock time, so the result also wandered by minutes over a single
+    charge.
+
+    The timestamp is therefore anchored once and then held for the rest of
+    the session. It is re-anchored only when a genuinely new session
+    starts, which shows up as the device counter jumping backwards — a
+    battery swapped out and back in fast enough that no idle poll fell in
+    between still resets the counter.
+
+    Callers must only pass a work state the device actually reported. A
+    cycle that produced no WorkState frame at all carries no information
+    about the session and must leave the latch untouched, rather than
+    reaching CLEAR here and re-anchoring on the next frame.
+    """
+    if work_state in ("empty", "idle") or work_period <= 0:
+        return ChargeSessionAction.CLEAR
+    if not has_anchor or work_period < last_work_period:
+        return ChargeSessionAction.ANCHOR
+    return ChargeSessionAction.KEEP
 
 
 _CHANNEL_UID_RE = re.compile(r"ch(\d+)_(.+)$")
@@ -260,6 +354,29 @@ def is_stale_charger_unique_id(
         return int(m.group(1)) > channel_count
 
     return False
+
+
+def should_inherit_area(
+    device_area: str | None, main_area: str, previous_area: str | None = None
+) -> bool:
+    """Whether a slot/port sub-device should take over the main device's area.
+
+    Slots and ports are separate devices so their sensors group nicely, but
+    Home Assistant asks for an area per device and inherits nothing along
+    ``via_device``. Sub-devices therefore follow the main device — unless
+    the user deliberately put one somewhere else.
+
+    ``previous_area`` is the area the main device just moved away from. A
+    sub-device still sitting there was following the main device, so it
+    moves along; one in any other area was placed by hand and stays put.
+    At setup time there is no previous area, so only sub-devices without
+    an area at all are filled in.
+    """
+    if device_area == main_area:
+        return False  # already correct
+    if device_area is None:
+        return True  # never assigned
+    return device_area == previous_area
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +419,50 @@ MASS2_PROTOCOL_MAP = {
 }
 
 # ---------------------------------------------------------------------------
+# PS200 adapter commands (Power 200 / 200H / 200X, written to CHAR_UUID_AF01)
+# ---------------------------------------------------------------------------
+
+# WorkingStatusReq: polls all output channels (wireless pad + USB ports)
+# Response CMD: 0x95
+CMD_PS200_WORK_STATUS_REQ = bytearray([0x12, 0x94])
+
+# DCStatusReq: polls the DC barrel connector status
+# Response CMD: 0x97
+CMD_PS200_DC_STATUS_REQ = bytearray([0x12, 0x96])
+
+# PS200 response command bytes
+RESP_PS200_WORK_STATUS = 0x95   # PS200WorkingStatusResp (variable length)
+RESP_PS200_DC_STATUS   = 0x97   # PS200DCStatusResp (variable length)
+
+# PS200 per-channel record size in WorkingStatusResp / DCStatusResp
+PS200_WORK_STATUS_CHANNEL_SIZE = 34
+PS200_DC_STATUS_CHANNEL_SIZE = 22
+
+# PS200 fast-charge protocol mapping (chargingProtocol in Power200Base)
+PS200_PROTOCOL_MAP = {
+    0: "none",
+    1: "other",
+    2: "qc2",     # QC2.0
+    3: "qc3",     # QC3.0
+    4: "pd2",     # PD2.0
+    5: "pd3",     # PD3.0
+}
+
+# Phone brand detected by the wireless charging pad (channel 0). The pad
+# recognizes the phone via its wireless-charging handshake and reports the
+# brand index plus (for some brands) the phone's battery level.
+PS200_PHONE_BRANDS = {
+    0: None,
+    1: "Apple",
+    2: "Samsung",
+    3: "Google",
+    4: "Sony",
+    5: "LG",
+    6: "Xiaomi",
+    7: "HUAWEI",
+}
+
+# ---------------------------------------------------------------------------
 # Firmware update check (public ISDT OTA API, no auth required)
 # ---------------------------------------------------------------------------
 OTA_BLE_URL = "https://www.isdt.co/ota/newble.json"
@@ -318,6 +479,8 @@ MODEL_OTA_NAME_MAP: dict[str, str] = {
     "608PD": "608PD",
     "EDGE": "EDGE",
     "Power 200": "Power200",
+    "Power 200H": "Power200H",
+    "Power 200X": "Power200X",
 }
 
 
