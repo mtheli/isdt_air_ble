@@ -21,7 +21,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     AdapterProtocol,
+    ChargeSessionAction,
     DeviceType,
+    charge_session_action,
     get_port_count,
     get_port_labels,
     supports_cell_voltages,
@@ -337,42 +339,56 @@ class ISDTC4EnergySensor(ISDTC4AirSensorBase):
 
 
 class ISDTC4TimeSensor(ISDTC4AirSensorBase):
-    """Charge time as timestamp (charging start time), live-updating via frontend."""
+    """Timestamp marking when the current charge session started."""
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_icon = "mdi:timer-outline"
 
     def __init__(self, coordinator, translation_key, data_key, channel, slot=None):
         super().__init__(coordinator, translation_key, data_key, channel, slot=slot)
-        self._frozen_start = None
+        self._session_start = None
+        self._last_work_period = 0
 
     @property
     def native_value(self):
-        """Return charging start time computed from work_period.
+        """Return when the current charge session started.
 
-        Frozen when status is 'done' so the displayed duration stops at the
-        final charge time instead of continuing to count up.
+        The timestamp is latched once per session and then held, so it only
+        changes when a battery is actually swapped or a new charge begins —
+        see charge_session_action() for why recomputing it per poll made the
+        value drift and spam the recorder.
         """
         if not self.coordinator.data or self._channel not in self.coordinator.data:
             return None
         from homeassistant.util import dt as dt_util
         from datetime import timedelta
         ch = self.coordinator.data[self._channel]
-        work_period = ch.get("work_period", 0) or 0
         work_state = ch.get("work_state_str")
+        if work_state is None:
+            # No WorkState frame in this poll cycle (BLE hiccup). Says
+            # nothing about the session — hold the latch instead of
+            # dropping it and re-anchoring on the next frame.
+            return self._session_start
 
-        if work_period <= 0 or work_state in ("empty", "idle"):
-            self._frozen_start = None
+        work_period = ch.get("work_period", 0) or 0
+
+        action = charge_session_action(
+            work_state,
+            work_period,
+            self._last_work_period,
+            self._session_start is not None,
+        )
+
+        if action == ChargeSessionAction.CLEAR:
+            self._session_start = None
+            self._last_work_period = 0
             return None
 
-        if work_state == "done":
-            if self._frozen_start is None:
-                self._frozen_start = dt_util.utcnow() - timedelta(seconds=work_period)
-            return self._frozen_start
+        if action == ChargeSessionAction.ANCHOR:
+            self._session_start = dt_util.utcnow() - timedelta(seconds=work_period)
 
-        # charging / error: live computation, clear any frozen state
-        self._frozen_start = None
-        return dt_util.utcnow() - timedelta(seconds=work_period)
+        self._last_work_period = work_period
+        return self._session_start
 
 
 class ISDTC4BatteryTypeSensor(ISDTC4AirSensorBase):

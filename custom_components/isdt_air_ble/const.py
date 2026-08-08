@@ -24,6 +24,14 @@ class AdapterProtocol(StrEnum):
     MASS2 = "mass2"
     PS200 = "ps200"
 
+
+class ChargeSessionAction(StrEnum):
+    """What the "Charging Since" sensor should do with its latched start time."""
+
+    CLEAR = "clear"    # no battery / not charging — report nothing
+    ANCHOR = "anchor"  # (re)compute the start time from the device counter
+    KEEP = "keep"      # keep the timestamp already latched for this session
+
 # Options
 CONF_SCAN_INTERVAL = "scan_interval"
 DEFAULT_SCAN_INTERVAL = 5  # seconds
@@ -275,6 +283,39 @@ def supports_cell_voltages(model: str) -> bool:
     leads, so it never produces cell-voltage data.
     """
     return "A8" not in model.upper()
+
+
+def charge_session_action(
+    work_state: str,
+    work_period: int,
+    last_work_period: int,
+    has_anchor: bool,
+) -> ChargeSessionAction:
+    """Decide how the "Charging Since" timestamp reacts to a poll.
+
+    The start of a charge is derived as ``now - work_period``, but neither
+    side of that subtraction is stable: ``now`` carries microseconds, so
+    recomputing it on every poll wrote a new state every couple of seconds,
+    and the device's own counter does not advance in lockstep with
+    wall-clock time, so the result also wandered by minutes over a single
+    charge.
+
+    The timestamp is therefore anchored once and then held for the rest of
+    the session. It is re-anchored only when a genuinely new session
+    starts, which shows up as the device counter jumping backwards — a
+    battery swapped out and back in fast enough that no idle poll fell in
+    between still resets the counter.
+
+    Callers must only pass a work state the device actually reported. A
+    cycle that produced no WorkState frame at all carries no information
+    about the session and must leave the latch untouched, rather than
+    reaching CLEAR here and re-anchoring on the next frame.
+    """
+    if work_state in ("empty", "idle") or work_period <= 0:
+        return ChargeSessionAction.CLEAR
+    if not has_anchor or work_period < last_work_period:
+        return ChargeSessionAction.ANCHOR
+    return ChargeSessionAction.KEEP
 
 
 _CHANNEL_UID_RE = re.compile(r"ch(\d+)_(.+)$")
