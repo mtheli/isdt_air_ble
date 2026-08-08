@@ -12,5 +12,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/mtheli/isdt_air_ble/issues",
   "requirements": [],
-  "version": "0.10.0-beta.1"
+  "version": "0.10.0-beta.2"
 }
