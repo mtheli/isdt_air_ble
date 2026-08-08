@@ -5,8 +5,9 @@ import logging
 from homeassistant.components.bluetooth import async_last_service_info
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.event import async_track_device_registry_updated_event
 
 from .const import (
     CONF_BIND_UUID,
@@ -25,6 +26,7 @@ from .const import (
     get_channel_count,
     get_device_type,
     is_stale_charger_unique_id,
+    should_inherit_area,
 )
 from .coordinator import ISDTDataUpdateCoordinator
 
@@ -95,6 +97,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    _async_setup_area_inheritance(hass, entry, address)
+
     # Start persistent connection loop in the background
     coordinator.start_live_monitoring()
 
@@ -106,6 +110,87 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload the entry when options change."""
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+@callback
+def _async_setup_area_inheritance(
+    hass: HomeAssistant, entry: ConfigEntry, address: str
+) -> None:
+    """Keep slot/port sub-devices in the same area as the main device.
+
+    Every slot and every output port is its own device (linked to the main
+    device via ``via_device``) so its sensors group nicely — but Home
+    Assistant then asks for an area per device, up to nine times on an
+    A8 Air and six times on a Power 200. Areas are not inherited along
+    ``via_device``, so without this the user assigns the same area over
+    and over.
+
+    Applied once at setup and again whenever the main device is moved to
+    a different area. A sub-device the user placed somewhere else on
+    purpose keeps its own area — only ones with no area at all, or ones
+    still sitting in the main device's previous area, follow along.
+    """
+    _async_inherit_area(hass, entry, address)
+
+    dev_reg = dr.async_get(hass)
+    main_device = dev_reg.async_get_device(identifiers={(DOMAIN, address)})
+    if main_device is None:
+        return
+
+    @callback
+    def _main_device_updated(
+        event: Event[dr.EventDeviceRegistryUpdatedData],
+    ) -> None:
+        """Propagate an area change on the main device to the sub-devices."""
+        if event.data["action"] != "update":
+            return
+        changes = event.data["changes"]
+        if "area_id" not in changes:
+            return
+        _async_inherit_area(hass, entry, address, previous_area=changes["area_id"])
+
+    entry.async_on_unload(
+        async_track_device_registry_updated_event(
+            hass, main_device.id, _main_device_updated
+        )
+    )
+
+
+@callback
+def _async_inherit_area(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    address: str,
+    previous_area: str | None = None,
+) -> None:
+    """Copy the main device's area to sub-devices that should follow it.
+
+    ``previous_area`` is the area the main device was in before it moved;
+    sub-devices still sitting there are considered inherited and are moved
+    along. Passing ``None`` (the setup case) only fills sub-devices that
+    have no area yet.
+
+    Home Assistant cannot tell "never assigned" apart from "deliberately
+    cleared", so a sub-device whose area the user removes by hand gets the
+    main device's area back on the next reload.
+    """
+    dev_reg = dr.async_get(hass)
+    main_device = dev_reg.async_get_device(identifiers={(DOMAIN, address)})
+    if main_device is None or main_device.area_id is None:
+        return
+
+    area_id = main_device.area_id
+    for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
+        if device.id == main_device.id:
+            continue
+        if not should_inherit_area(device.area_id, area_id, previous_area):
+            continue
+        _LOGGER.debug(
+            "Inheriting area %s from main device for sub-device %s",
+            area_id,
+            device.name,
+        )
+        dev_reg.async_update_device(device.id, area_id=area_id)
 
 
 def _async_cleanup_stale_registry(

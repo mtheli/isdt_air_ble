@@ -315,6 +315,29 @@ def is_stale_charger_unique_id(
     return False
 
 
+def should_inherit_area(
+    device_area: str | None, main_area: str, previous_area: str | None = None
+) -> bool:
+    """Whether a slot/port sub-device should take over the main device's area.
+
+    Slots and ports are separate devices so their sensors group nicely, but
+    Home Assistant asks for an area per device and inherits nothing along
+    ``via_device``. Sub-devices therefore follow the main device — unless
+    the user deliberately put one somewhere else.
+
+    ``previous_area`` is the area the main device just moved away from. A
+    sub-device still sitting there was following the main device, so it
+    moves along; one in any other area was placed by hand and stays put.
+    At setup time there is no previous area, so only sub-devices without
+    an area at all are filled in.
+    """
+    if device_area == main_area:
+        return False  # already correct
+    if device_area is None:
+        return True  # never assigned
+    return device_area == previous_area
+
+
 # ---------------------------------------------------------------------------
 # MASS2 adapter commands (written to CHAR_UUID_AF01)
 # ---------------------------------------------------------------------------
