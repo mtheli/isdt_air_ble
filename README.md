@@ -25,9 +25,9 @@ A matching dashboard card is available: **[ISDT Charger Card](https://github.com
 | ISDT C4 Air | 6-Channel Round-Cell Charger | Tested ✓ ([@mtheli](https://github.com/mtheli)) |
 | ISDT A8 Air | 8-Channel Round-Cell Charger | Tested ✓ ([@stuartp44](https://github.com/stuartp44)) |
 | ISDT MASS2 | USB Adapter | Tested ✓ ([@mtheli](https://github.com/mtheli)) |
-| ISDT Air 8 | 1S–8S LiPo Balance Charger (single channel, 8 A) | Tested ✓ ([@TRES9000](https://github.com/TRES9000), 6S pack, [issue #2](https://github.com/mtheli/isdt_air_ble/issues/2)) |
-| ISDT K2 Air | Dual-Channel LiPo Balance Charger (2 × 1S–6S, 20 A per channel) | Testing in progress ([@Mngnt](https://github.com/Mngnt), [issue #3](https://github.com/mtheli/isdt_air_ble/issues/3)) |
-| ISDT Power 200 / 200H / 200X | Desktop Power Supply (wireless pad + 4 USB ports) | Tested ✓ ([@Megachip](https://github.com/Megachip), 200H, [issue #5](https://github.com/mtheli/isdt_air_ble/issues/5)) |
+| ISDT Air 8 | 1S–8S LiPo Balance Charger (single channel, 8 A) | Tested ✓ ([@TRES9000](https://github.com/TRES9000), 6S pack, [#2](https://github.com/mtheli/isdt_air_ble/issues/2)) |
+| ISDT K2 Air | Dual-Channel LiPo Balance Charger (2 × 1S–6S, 20 A per channel) | Testing in progress ([@Mngnt](https://github.com/Mngnt), [#3](https://github.com/mtheli/isdt_air_ble/issues/3)) |
+| ISDT Power 200 / 200H / 200X | Desktop Power Supply (wireless pad + 4 USB ports) | Tested ✓ ([@Megachip](https://github.com/Megachip), 200H, [#5](https://github.com/mtheli/isdt_air_ble/issues/5)) |
 | ISDT NP2 Air | Charger | Untested |
 | ISDT LP2 Air | Charger | Untested |
 | ISDT K4 | Charger | Untested |
