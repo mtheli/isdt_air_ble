@@ -31,6 +31,12 @@ sense, e.g. an external cause the reader could not know about.
 **What does not belong in the notes:** commit lists, file names, internal
 symbol names, test tallies, and documentation-only changes.
 
+**Credit belongs in the notes.** Name whoever reported the problem, tested
+the fix or supplied the logs, with `@handle` and the issue number, in the
+bullet their work belongs to. The `@` is not decoration: it notifies them
+and links their profile, and it is how the release and the issue thread
+explain each other.
+
 When an external change caused the release, link it. A reader who upgraded
 Home Assistant and then saw something break deserves to know the two are
 connected — link the core pull request or release that changed the
