@@ -152,6 +152,46 @@ Chargers run a 19-command cycle (1 alarm-tone + 6 channels × 3 commands) at 100
 
 For a detailed technical description of the BLE protocol including packet formats, command reference, and timing, see [PROTOCOL.md](PROTOCOL.md).
 
+## Charging Completion Automation Blueprint
+
+This repository includes an optional Home Assistant automation blueprint that
+can run user-defined actions when an ISDT charging session has ended.
+
+The blueprint uses the charger's **Total Charging Current** sensor instead of
+individual slot status sensors. This avoids false completion detection caused
+by temporary `unknown` or `unavailable` slot states during Bluetooth
+reconnections.
+
+> The blueprint is optional and is not installed automatically with the
+> integration through HACS. It must be imported separately into Home Assistant.
+
+### How it works
+
+1. A charging session is detected when the total charging current remains above
+   the configured start threshold.
+2. The automation waits until the total charging current remains below the
+   configured finish threshold.
+3. The user-configured completion actions are executed.
+
+Default values:
+
+- Charging start: above `0.05 A` for 15 seconds
+- Charging finish: below `0.01 A` for 1 minute
+- Maximum session duration: 24 hours
+
+The completion action is intentionally not predefined. Users can configure any
+Home Assistant action, such as a mobile notification, text-to-speech
+announcement, or light signal.
+
+### Import
+
+Import the blueprint into Home Assistant using the following URL:
+
+```text
+https://raw.githubusercontent.com/mtheli/isdt_air_ble/master/blueprints/automation/charging_complete.yaml
+```
+
+
 ## Disclaimer
 
 This is an independent community project and is not affiliated with, endorsed by, or sponsored by ISDT. All product names, trademarks, and registered trademarks are property of their respective owners.
