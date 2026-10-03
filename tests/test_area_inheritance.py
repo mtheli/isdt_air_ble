@@ -8,7 +8,7 @@ is the decision that drives it; the registry plumbing around it lives in
 
 from __future__ import annotations
 
-from isdt_air_ble.const import should_inherit_area
+from isdt_air_ble.const import is_sub_device_identifier, should_inherit_area
 
 LIVING_ROOM = "living_room"
 OFFICE = "office"
@@ -58,3 +58,12 @@ def test_previous_area_none_does_not_capture_unset_devices_twice():
     """``previous_area=None`` behaves like the plain setup case."""
     assert should_inherit_area(None, LIVING_ROOM, previous_area=None) is True
     assert should_inherit_area(OFFICE, LIVING_ROOM, previous_area=None) is False
+
+
+def test_sub_device_identifiers_name_slots_and_ports_only():
+    address = "50:54:7B:EB:D2:3A"
+    assert is_sub_device_identifier(f"{address}_slot1", address)
+    assert is_sub_device_identifier(f"{address}_port3", address)
+    assert not is_sub_device_identifier(address, address)
+    assert not is_sub_device_identifier(f"{address}_slot", address)
+    assert not is_sub_device_identifier("AA:BB:CC:DD:EE:FF_slot1", address)

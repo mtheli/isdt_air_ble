@@ -26,9 +26,11 @@ from .const import (
     get_channel_count,
     get_device_type,
     is_stale_charger_unique_id,
+    is_sub_device_identifier,
     should_inherit_area,
 )
 from .coordinator import ISDTDataUpdateCoordinator
+from .helpers import async_get_own_device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -97,19 +99,42 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    _async_link_sub_devices(hass, entry, address)
     _async_setup_area_inheritance(hass, entry, address)
 
     # Start persistent connection loop in the background
     coordinator.start_live_monitoring()
 
-    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
-
     return True
 
 
-async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload the entry when options change."""
-    await hass.config_entries.async_reload(entry.entry_id)
+@callback
+def _async_link_sub_devices(
+    hass: HomeAssistant, entry: ConfigEntry, address: str
+) -> None:
+    """Hang the slot and port sub-devices under the main device.
+
+    DeviceInfo(via_device=…) is deprecated since HA 2026.8 and its replacement,
+    via_device_id, needs the parent's registry id — which the entities cannot
+    know when they are built. The devices exist once the platforms are set up,
+    so the link is made here instead. Only an unset link is filled, so a
+    sub-device the user re-parented keeps its parent.
+    """
+    dev_reg = dr.async_get(hass)
+    main_device = async_get_own_device(dev_reg, address, entry.entry_id)
+    if main_device is None:
+        _LOGGER.debug(
+            "ISDT device %s not in registry, sub-devices left unlinked", address
+        )
+        return
+    for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
+        if device.id == main_device.id or device.via_device_id is not None:
+            continue
+        if any(
+            domain == DOMAIN and is_sub_device_identifier(identifier, address)
+            for domain, identifier in device.identifiers
+        ):
+            dev_reg.async_update_device(device.id, via_device_id=main_device.id)
 
 
 @callback
@@ -133,7 +158,7 @@ def _async_setup_area_inheritance(
     _async_inherit_area(hass, entry, address)
 
     dev_reg = dr.async_get(hass)
-    main_device = dev_reg.async_get_device(identifiers={(DOMAIN, address)})
+    main_device = async_get_own_device(dev_reg, address, entry.entry_id)
     if main_device is None:
         return
 
@@ -175,7 +200,7 @@ def _async_inherit_area(
     main device's area back on the next reload.
     """
     dev_reg = dr.async_get(hass)
-    main_device = dev_reg.async_get_device(identifiers={(DOMAIN, address)})
+    main_device = async_get_own_device(dev_reg, address, entry.entry_id)
     if main_device is None or main_device.area_id is None:
         return
 
@@ -240,9 +265,7 @@ def _async_cleanup_stale_registry(
                 _LOGGER.debug(
                     "Removing stale slot device %s (%s)", device.name, identifier
                 )
-                dev_reg.async_update_device(
-                    device.id, remove_config_entry_id=entry.entry_id
-                )
+                dev_reg.async_remove_device(device.id)
 
 
 def _detect_model_from_cache(hass: HomeAssistant, address: str) -> str | None:

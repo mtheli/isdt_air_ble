@@ -1119,8 +1119,11 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         if not self.hw_version and not self.sw_version:
             return
 
+        from .helpers import async_get_own_device
+
         registry = dr.async_get(self.hass)
-        device = registry.async_get_device(identifiers={("isdt_air_ble", self.address)})
+        entry_id = self.config_entry.entry_id if self.config_entry else None
+        device = async_get_own_device(registry, self.address, entry_id)
         if device is None:
             return
 

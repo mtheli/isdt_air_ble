@@ -356,6 +356,19 @@ def is_stale_charger_unique_id(
     return False
 
 
+def is_sub_device_identifier(identifier: str, address: str) -> bool:
+    """Whether a registry identifier names one of this device's slots or ports.
+
+    Slot devices are registered as ``<address>_slot<n>`` and port devices as
+    ``<address>_port<n>``; the main device is the bare address.
+    """
+    for kind in ("_slot", "_port"):
+        suffix = identifier.removeprefix(f"{address}{kind}")
+        if suffix != identifier and suffix.isdigit():
+            return True
+    return False
+
+
 def should_inherit_area(
     device_area: str | None, main_area: str, previous_area: str | None = None
 ) -> bool:

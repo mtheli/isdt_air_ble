@@ -10,7 +10,12 @@ import voluptuous as vol
 from bleak import BleakClient
 from bleak_retry_connector import establish_connection
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow, ConfigEntry
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, ConfigEntry
+
+try:  # HA ≥ 2025.8
+    from homeassistant.config_entries import OptionsFlowWithReload
+except ImportError:  # older cores: the fallback loses only the reload on save
+    from homeassistant.config_entries import OptionsFlow as OptionsFlowWithReload
 from homeassistant.components.bluetooth import (
     BluetoothServiceInfoBleak,
     async_ble_device_from_address,
@@ -73,7 +78,7 @@ def _detect_model(discovery_info: BluetoothServiceInfoBleak) -> str:
     return "ISDT Device"
 
 
-class ISDTOptionsFlow(OptionsFlow):
+class ISDTOptionsFlow(OptionsFlowWithReload):
     """Handle options for ISDT chargers."""
 
     async def async_step_init(
