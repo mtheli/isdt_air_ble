@@ -429,11 +429,16 @@ def parse_ir(data: bytes) -> dict:
     }
 
 
-def parse_hardware_info(data: bytes) -> tuple[str, str, str] | None:
+def parse_hardware_info(data: bytes) -> tuple[str, str, str | None] | None:
     """Parse HardwareInfoResp (CMD RESP_HARDWARE_INFO) received on characteristic AF02.
 
     The CMD byte may be at position 0 (no 0x31 frame header) or 1 (with 0x31 prefix).
     Layout after CMD: hw_main (1), hw_sub (1), sw_main (1), sw_sub (1), device_id (8 LE).
+
+    Not every firmware puts a device ID into the last 8 bytes. The C4 Air and
+    MASS2 send their padded model name ("C4Air   ", "MASS2   "), the K4 sends
+    "CENTPERI", and blank fields come as all 0x00 or 0xFF. None of these
+    identify the unit, so serial_number is None for them.
 
     Returns:
         (hw_version, sw_version, serial_number) or None on error.
@@ -462,10 +467,20 @@ def parse_hardware_info(data: bytes) -> tuple[str, str, str] | None:
 
     hw_version    = f"{data[offset + 1]}.{data[offset + 2]}"
     sw_version    = f"{data[offset + 3]}.{data[offset + 4]}"
-    device_id     = int.from_bytes(data[offset + 5 : offset + 13], "little")
-    serial_number = f"{device_id:016X}"
+    raw_id        = data[offset + 5 : offset + 13]
+    serial_number = None
+    if not _is_placeholder_device_id(raw_id):
+        serial_number = f"{int.from_bytes(raw_id, 'little'):016X}"
 
     return hw_version, sw_version, serial_number
+
+
+def _is_placeholder_device_id(raw_id: bytes) -> bool:
+    """Return True if the HardwareInfo device-ID field holds no real ID."""
+    if raw_id in (b"\x00" * 8, b"\xff" * 8):
+        return True
+    # Printable ASCII text (model name, "CENTPERI"), not a binary ID
+    return all(0x20 <= b <= 0x7E for b in raw_id)
 
 
 # ---------------------------------------------------------------------------

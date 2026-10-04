@@ -1134,6 +1134,9 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             updates["hw_version"] = self.hw_version
         if self.serial_number:
             updates["serial_number"] = self.serial_number
+        elif device.serial_number:
+            # Earlier versions stored the model name as serial number
+            updates["serial_number"] = None
 
         if updates:
             registry.async_update_device(device.id, **updates)

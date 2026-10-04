@@ -107,6 +107,8 @@ Offset  Length  Field
 5       8       Device ID (uint64, little-endian) → serial number
 ```
 
+Not every firmware fills the device ID. The C4 Air and MASS2 send their model name padded with spaces (`C4Air   `, `MASS2   `), the K4 sends `CENTPERI`. Text like this, or a field of all `0x00`/`0xFF`, is not used as serial number.
+
 ## Response Frame Format
 
 All AF01 notification responses from ISDT chargers share a common frame structure:

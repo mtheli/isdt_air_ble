@@ -42,7 +42,7 @@ The integration auto-detects the device model from BLE manufacturer data and exp
 - **Persistent BLE connection** with automatic reconnect
 - **Slot / port sub-devices** with detailed per-slot or per-port sensors (6 slots for chargers, 8 USB ports for MASS2)
 - **Live charge timer** (chargers) using timestamp-based tracking — updates in real-time in the frontend
-- **Hardware info** — firmware version, hardware version, serial number in the device registry
+- **Hardware info** — firmware version, hardware version, serial number (where the charger sends one) in the device registry
 - **Configurable poll interval** (3–300 seconds) via options flow
 
 ### Chargers (C4 Air, A8 Air)
