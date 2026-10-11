@@ -1,0 +1,134 @@
+blueprint:
+  name: ISDT Air BLE - Charging completed
+  description: >-
+    Detects an actual charging session using the charger's total charging
+    current and runs configurable actions when the charging current remains
+    below the configured finish threshold for a defined period.
+
+    This blueprint does not use individual slot status sensors. Temporary
+    unknown or unavailable slot states caused by Bluetooth reconnects therefore
+    do not affect completion detection.
+
+    Important: The blueprint detects that charging current has stopped. It
+    cannot distinguish between a successfully completed charging session,
+    manually removed batteries, or a manually aborted charging session.
+  domain: automation
+  author: agarthand
+  homeassistant:
+    min_version: 2024.10.0
+
+  input:
+    charging_current:
+      name: Total charging current
+      description: >-
+        Select the sensor that reports the total charging current of all slots,
+        for example sensor.isdt_c4_air_total_charging_current.
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: current
+
+    start_threshold:
+      name: Charging start threshold
+      description: >-
+        A charging session is detected when the total charging current remains
+        above this threshold for the configured start duration.
+      default: 0.05
+      selector:
+        number:
+          min: 0
+          max: 5
+          step: 0.01
+          unit_of_measurement: A
+          mode: box
+
+    start_duration:
+      name: Charging start duration
+      description: >-
+        The total charging current must remain above the start threshold for
+        this duration before a charging session is recognized.
+      default:
+        seconds: 15
+      selector:
+        duration:
+
+    finish_threshold:
+      name: Charging finish threshold
+      description: >-
+        Charging is considered finished when the total charging current remains
+        below this threshold for the configured finish duration.
+      default: 0.01
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.01
+          unit_of_measurement: A
+          mode: box
+
+    finish_duration:
+      name: Charging finish duration
+      description: >-
+        The total charging current must remain below the finish threshold for
+        this duration before the completion actions are run.
+      default:
+        minutes: 1
+      selector:
+        duration:
+
+    maximum_session_duration:
+      name: Maximum charging session duration
+      description: >-
+        Maximum time to wait for the charging session to finish. No completion
+        action is run if this timeout is reached.
+      default:
+        hours: 24
+      selector:
+        duration:
+
+    completion_actions:
+      name: Completion actions
+      description: >-
+        Actions to run after charging has been detected as finished. This can
+        be a mobile notification, text-to-speech announcement, light signal,
+        or any other Home Assistant action.
+      selector:
+        action:
+
+mode: single
+max_exceeded: silent
+
+variables:
+  charging_current_entity: !input charging_current
+
+trigger:
+  - platform: numeric_state
+    entity_id: !input charging_current
+    above: !input start_threshold
+    for: !input start_duration
+
+condition: []
+
+action:
+  - alias: Wait until charging current remains below the finish threshold
+    wait_for_trigger:
+      - platform: numeric_state
+        entity_id: !input charging_current
+        below: !input finish_threshold
+        for: !input finish_duration
+    timeout: !input maximum_session_duration
+    continue_on_timeout: false
+
+  - alias: Prepare values for the completion actions
+    variables:
+      isdt_charging_current: >-
+        {{ states(charging_current_entity) }}
+      isdt_charging_current_unit: >-
+        {{ state_attr(charging_current_entity, 'unit_of_measurement') or 'A' }}
+      isdt_completion_time: >-
+        {{ now().strftime('%Y-%m-%d %H:%M:%S') }}
+
+  - alias: Run the configured completion actions
+    choose: []
+    default: !input completion_actions
