@@ -10,6 +10,24 @@ Supports the **C4 Air** (6-channel charger), **A8 Air** (8-channel charger), **A
 
 ![Device Overview](images/device_overview.png)
 
+---
+
+## Table of Contents
+
+- [Lovelace Card](#lovelace-card)
+- [Supported Devices](#supported-devices)
+- [Features](#features)
+  - [Chargers (C4 Air, A8 Air)](#chargers-c4-air-a8-air)
+  - [MASS2 USB Adapter](#mass2-usb-adapter)
+- [Screenshots](#screenshots)
+- [Installation](#installation)
+- [Setup](#setup)
+- [Configuration](#configuration)
+- [Charging Completion Automation Blueprint](#charging-completion-automation-blueprint)
+- [BLE Protocol](#ble-protocol)
+
+---
+
 ## Lovelace Card
 
 A matching dashboard card is available: **[ISDT Charger Card](https://github.com/mtheli/isdt_air_card)** — battery-style slots with live charge timer, connection indicator, and full HA theme support.
@@ -139,19 +157,6 @@ After setup, you can adjust the **poll interval** via the integration options:
 3. Click **Configure**
 4. Set the poll interval (default: 5 seconds, range: 3–300)
 
-## BLE Protocol
-
-The integration communicates directly via BLE — no cloud, no account required. All communication is fully local.
-
-Both chargers and the MASS2 adapter use a single GATT service with two characteristics:
-
-- **AF01** – Data polling via continuous command cycling (charger: workstate, electric, IR, alarm tone; MASS2: port status, settings)
-- **AF02** – Bind handshake and hardware info query (once after connect, before polling)
-
-Chargers run a 19-command cycle (1 alarm-tone + 6 channels × 3 commands) at 100 ms intervals. The MASS2 uses a single WorkStatus poll per cycle. BLE notifications for the MASS2 are reassembled across fragments to handle the default 23-byte ATT MTU correctly.
-
-For a detailed technical description of the BLE protocol including packet formats, command reference, and timing, see [PROTOCOL.md](PROTOCOL.md).
-
 ## Charging Completion Automation Blueprint
 
 This repository includes an optional Home Assistant automation blueprint that
@@ -199,6 +204,19 @@ Or import it manually using the following URL:
 ```text
 https://raw.githubusercontent.com/mtheli/isdt_air_ble/master/blueprints/automation/charging_complete.yaml
 ```
+
+## BLE Protocol
+
+The integration communicates directly via BLE — no cloud, no account required. All communication is fully local.
+
+Both chargers and the MASS2 adapter use a single GATT service with two characteristics:
+
+- **AF01** – Data polling via continuous command cycling (charger: workstate, electric, IR, alarm tone; MASS2: port status, settings)
+- **AF02** – Bind handshake and hardware info query (once after connect, before polling)
+
+Chargers run a 19-command cycle (1 alarm-tone + 6 channels × 3 commands) at 100 ms intervals. The MASS2 uses a single WorkStatus poll per cycle. BLE notifications for the MASS2 are reassembled across fragments to handle the default 23-byte ATT MTU correctly.
+
+For a detailed technical description of the BLE protocol including packet formats, command reference, and timing, see [PROTOCOL.md](PROTOCOL.md).
 
 ## Disclaimer
 
