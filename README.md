@@ -23,7 +23,8 @@ Supports the **C4 Air** (6-channel charger), **A8 Air** (8-channel charger), **A
 - [Installation](#installation)
 - [Setup](#setup)
 - [Configuration](#configuration)
-- [Charging Completion Automation Blueprint](#charging-completion-automation-blueprint)
+- [Blueprints](#blueprints)
+  - [Charging Completion](#charging-completion)
 - [BLE Protocol](#ble-protocol)
 
 ---
@@ -157,10 +158,15 @@ After setup, you can adjust the **poll interval** via the integration options:
 3. Click **Configure**
 4. Set the poll interval (default: 5 seconds, range: 3–300)
 
-## Charging Completion Automation Blueprint
+## Blueprints
 
-This repository includes an optional Home Assistant automation blueprint that
-can run user-defined actions when an ISDT charging session has ended.
+Optional Home Assistant automation blueprints for common use cases. They are
+not installed with the integration through HACS; import each one separately
+into Home Assistant.
+
+### Charging Completion
+
+Runs user-defined actions when an ISDT charging session has ended.
 Contributed by [@agarthand](https://github.com/agarthand) in
 [#9](https://github.com/mtheli/isdt_air_ble/pull/9).
 
@@ -169,10 +175,7 @@ individual slot status sensors. This avoids false completion detection caused
 by temporary `unknown` or `unavailable` slot states during Bluetooth
 reconnections.
 
-> The blueprint is optional and is not installed automatically with the
-> integration through HACS. It must be imported separately into Home Assistant.
-
-### How it works
+#### How it works
 
 1. A charging session is detected when the total charging current remains above
    the configured start threshold.
@@ -195,7 +198,7 @@ announcement, or light signal. Templates in these actions can use
 A restart of Home Assistant while a session is running ends the wait, so no
 completion action runs for that session.
 
-### Import
+#### Import
 
 [![Open your Home Assistant instance and show the blueprint import dialog with this blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fmtheli%2Fisdt_air_ble%2Fmaster%2Fblueprints%2Fautomation%2Fcharging_complete.yaml)
 
