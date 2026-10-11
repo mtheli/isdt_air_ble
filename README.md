@@ -156,6 +156,8 @@ For a detailed technical description of the BLE protocol including packet format
 
 This repository includes an optional Home Assistant automation blueprint that
 can run user-defined actions when an ISDT charging session has ended.
+Contributed by [@agarthand](https://github.com/agarthand) in
+[#9](https://github.com/mtheli/isdt_air_ble/pull/9).
 
 The blueprint uses the charger's **Total Charging Current** sensor instead of
 individual slot status sensors. This avoids false completion detection caused
