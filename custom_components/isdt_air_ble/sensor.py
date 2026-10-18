@@ -2,7 +2,6 @@
 
 import logging
 
-from homeassistant.components import bluetooth
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -214,8 +213,8 @@ class ISDTC4AirSensorBase(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if coordinator is successfully updating."""
-        return self.coordinator.last_update_success
+        """Return True while the device is connected."""
+        return self.coordinator.connected
 
     @property
     def native_value(self):
@@ -300,7 +299,7 @@ class ISDTC4BatterySensor(ISDTC4AirSensorBase):
     @property
     def available(self) -> bool:
         """Only show battery sensor when a battery is actually connected."""
-        if not self.coordinator.last_update_success:
+        if not self.coordinator.connected:
             return False
         
         if not self.coordinator.data or self._channel not in self.coordinator.data:
@@ -461,8 +460,8 @@ class ISDTC4CellVoltageSensor(ISDTC4AirSensorBase):
 
     @property
     def available(self):
-        """Only available when a cell is actually present."""
-        return self.native_value is not None
+        """Only available while connected and a cell is actually present."""
+        return self.coordinator.connected and self.native_value is not None
 
 
 class ISDTC4TotalChargingSensor(ISDTC4AirSensorBase):
@@ -537,10 +536,7 @@ class ISDTMASS2SensorBase(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        service_info = bluetooth.async_last_service_info(
-            self.hass, self.coordinator.address, connectable=True
-        )
-        return service_info is not None
+        return self.coordinator.connected
 
     @property
     def native_value(self):
@@ -674,10 +670,7 @@ class ISDTMASS2PortStatusSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        service_info = bluetooth.async_last_service_info(
-            self.hass, self.coordinator.address, connectable=True
-        )
-        return service_info is not None
+        return self.coordinator.connected
 
     @property
     def native_value(self):
@@ -752,10 +745,7 @@ class ISDTMASS2TotalPowerSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        service_info = bluetooth.async_last_service_info(
-            self.hass, self.coordinator.address, connectable=True
-        )
-        return service_info is not None
+        return self.coordinator.connected
 
     @property
     def native_value(self):

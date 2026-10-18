@@ -52,7 +52,7 @@ class ISDTC4AlarmToneSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def available(self) -> bool:
         """Available when we have received at least one alarm tone status."""
-        return super().available and self.coordinator.alarm_tone_on is not None
+        return self.coordinator.connected and self.coordinator.alarm_tone_on is not None
 
     @property
     def icon(self):
@@ -102,7 +102,7 @@ class ISDTMASS2BeepSwitch(CoordinatorEntity, SwitchEntity):
 
     @property
     def available(self) -> bool:
-        return super().available and self.coordinator.mass2_settings is not None
+        return self.coordinator.connected and self.coordinator.mass2_settings is not None
 
     @property
     def icon(self):

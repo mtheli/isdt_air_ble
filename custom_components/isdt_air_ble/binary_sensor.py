@@ -54,6 +54,10 @@ class ISDTC4SlotActiveSensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_device_info = slot_device_info(address, slot, model)
 
     @property
+    def available(self) -> bool:
+        return self.coordinator.connected
+
+    @property
     def is_on(self):
         """Return True if the slot is actively charging."""
         if self.coordinator.data and self._channel in self.coordinator.data:
@@ -118,6 +122,10 @@ class ISDTC4BatteryInsertedSensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_device_info = slot_device_info(address, slot, model)
 
     @property
+    def available(self) -> bool:
+        return self.coordinator.connected
+
+    @property
     def is_on(self):
         """Return True if a battery is present in the slot."""
         if not self.coordinator.data or self._channel not in self.coordinator.data:
@@ -151,6 +159,10 @@ class ISDTC4SlotErrorSensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_device_info = slot_device_info(address, slot, model)
 
     @property
+    def available(self) -> bool:
+        return self.coordinator.connected
+
+    @property
     def is_on(self):
         """Return True if the slot has an error."""
         if not self.coordinator.data or self._channel not in self.coordinator.data:
@@ -179,7 +191,7 @@ class ISDTC4ConnectedSensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def is_on(self):
         """Return True if the BLE connection is active."""
-        return self.coordinator._connected
+        return self.coordinator.connected
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +214,10 @@ class ISDTMASS2PortActiveSensor(CoordinatorEntity, BinarySensorEntity):
 
         self._attr_unique_id = f"{address}_port{port_num}_active"
         self._attr_device_info = port_device_info(address, port_num, model)
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.connected
 
     @property
     def is_on(self):

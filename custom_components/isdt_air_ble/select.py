@@ -52,7 +52,7 @@ class ISDTMASS2VolumeSelect(CoordinatorEntity, SelectEntity):
 
     @property
     def available(self) -> bool:
-        return super().available and self.coordinator.mass2_settings is not None
+        return self.coordinator.connected and self.coordinator.mass2_settings is not None
 
     async def async_select_option(self, option: str) -> None:
         value = self._OPTION_TO_VALUE.get(option)

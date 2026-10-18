@@ -907,6 +907,11 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             except Exception:
                 pass
 
+    @property
+    def connected(self) -> bool:
+        """Return True while the BLE link to the device is up."""
+        return self._connected
+
     async def _disconnect(self):
         """Disconnect from BLE device (with timeout to avoid hanging).
 
@@ -920,6 +925,10 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         self._connected = False
         self._notification_started = False
         self._connect_time = None
+        if was_connected:
+            # Entities follow the connection, so they have to hear about it
+            # even when the bleak callback does not fire.
+            self.async_update_listeners()
 
         if client is None:
             return
