@@ -29,7 +29,7 @@ function $d8078e452c66bdbe$export$625550452a3fa3ec(hass, key) {
 
 
 // Written by the release sync script (isdt_air_ble scripts/sync_card.sh).
-const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.11.0-beta.1";
+const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.11.0-beta.2";
 const $8ee5ce714273e53b$export$9b657414b7dffe40 = "bundled";
 
 
@@ -1655,13 +1655,20 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
     .slot-vi ha-icon { --mdc-icon-size: 13px; opacity: 0.45; }
     .slot-vi span { cursor: pointer; }
     .slot-vi span:hover { color: var(--accent-color); }
+    /* Narrow slots: the energy moves to its own line as a whole instead
+       of breaking inside the text ("555 mAh / 0.81" + "Wh"). */
     .slot-session {
-      display: flex; justify-content: space-between;
+      display: flex; flex-wrap: wrap; justify-content: space-between;
+      column-gap: 6px;
       font-family: ui-monospace, 'Roboto Mono', monospace;
       font-variant-numeric: tabular-nums; font-size: 9.5px;
       color: var(--secondary-text-color); margin-top: 1px;
     }
-    .slot-session span { display: flex; align-items: center; gap: 2px; cursor: pointer; }
+    .slot-session span {
+      display: flex; align-items: center; gap: 2px; cursor: pointer;
+      white-space: nowrap;
+    }
+    .slot-session .session-energy { margin-left: auto; }
     .slot-session span:hover { color: var(--primary-text-color); }
     .slot-session ha-icon { --mdc-icon-size: 12px; opacity: 0.5; }
     .status-badge { cursor: pointer; }
