@@ -29,7 +29,7 @@ function $d8078e452c66bdbe$export$625550452a3fa3ec(hass, key) {
 
 
 // Written by the release sync script (isdt_air_ble scripts/sync_card.sh).
-const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.10.3-beta.3";
+const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.11.0-beta.1";
 const $8ee5ce714273e53b$export$9b657414b7dffe40 = "bundled";
 
 
