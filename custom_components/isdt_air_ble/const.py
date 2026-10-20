@@ -78,6 +78,7 @@ BIND_RESULT_WAITING = 1
 
 # Config entry data keys
 CONF_BIND_UUID = "bind_uuid"
+CONF_MODEL_ID = "model_id"
 
 #   HardwareInfoReq: queries HW version, FW version, and serial number (once after connect)
 #   Response CMD: 0xE1 on AF02
@@ -502,6 +503,18 @@ MODEL_OTA_NAME_MAP: dict[str, str] = {
 }
 
 
+def model_id_from_mfg_data(mfr_data: bytes | None) -> str | None:
+    """Return the 4-byte ``DeviceModelID`` from ISDT manufacturer data as hex.
+
+    This is the manufacturer's own model code (``01070000`` on the C4 Air).
+    It is returned for unknown models too, since it identifies the hardware
+    even when ``DEVICE_MODEL_MAP`` has no name for it.
+    """
+    if not mfr_data or len(mfr_data) < 6:
+        return None
+    return mfr_data[2:6].hex()
+
+
 def detect_model_from_mfg_data(mfr_data: bytes | None) -> str | None:
     """Best-effort device-model detection from ISDT BLE manufacturer data.
 
@@ -518,10 +531,10 @@ def detect_model_from_mfg_data(mfr_data: bytes | None) -> str | None:
     Returning ``None`` means "unknown" — the caller should keep the
     previously stored model name or log a warning, but never invent one.
     """
-    if not mfr_data or len(mfr_data) < 6:
+    model_id = model_id_from_mfg_data(mfr_data)
+    if model_id is None:
         return None
 
-    model_id = mfr_data[2:6].hex()
     model = DEVICE_MODEL_MAP.get(model_id)
     if model:
         return model

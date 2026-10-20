@@ -10,7 +10,7 @@ Covers:
 
 from __future__ import annotations
 
-from isdt_air_ble.const import detect_model_from_mfg_data
+from isdt_air_ble.const import detect_model_from_mfg_data, model_id_from_mfg_data
 
 
 # --- Known device IDs ---------------------------------------------------------
@@ -78,3 +78,20 @@ def test_unknown_id_with_no_embedded_name_returns_none():
 def test_unknown_id_with_non_ascii_name_returns_none():
     mfg = b"\xaf\xfa\xde\xad\xbe\xef\xff\xfe\xfd"
     assert detect_model_from_mfg_data(mfg) is None
+
+
+# --- Model ID ----------------------------------------------------------------
+
+
+def test_model_id_is_the_hex_device_model_id():
+    assert model_id_from_mfg_data(bytes.fromhex("affa01070000") + b"C4Air\x00") == "01070000"
+
+
+def test_model_id_kept_for_unknown_models():
+    assert model_id_from_mfg_data(bytes.fromhex("affa0199aa00") + b"X9Air\x00") == "0199aa00"
+
+
+def test_model_id_none_for_short_payloads():
+    assert model_id_from_mfg_data(None) is None
+    assert model_id_from_mfg_data(b"") is None
+    assert model_id_from_mfg_data(bytes.fromhex("affa0107")) is None

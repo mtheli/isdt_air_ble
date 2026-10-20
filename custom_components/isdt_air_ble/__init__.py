@@ -11,6 +11,7 @@ from homeassistant.helpers.event import async_track_device_registry_updated_even
 
 from .const import (
     CONF_BIND_UUID,
+    CONF_MODEL_ID,
     CONF_PHANTOM_DEBOUNCE,
     CONF_PHANTOM_SUSTAIN,
     CONF_PHANTOM_THRESHOLD,
@@ -23,6 +24,7 @@ from .const import (
     DeviceType,
     ISDT_MANUFACTURER_ID,
     detect_model_from_mfg_data,
+    model_id_from_mfg_data,
     get_channel_count,
     get_device_type,
     is_stale_charger_unique_id,
@@ -46,7 +48,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Early Air 8 setups were misidentified as "C4 Air" because the device
     # model ID 01030000 used to be mapped there. This silently migrates
     # affected entries without forcing the user to delete & re-add.
-    detected_model = _detect_model_from_cache(hass, address)
+    mfr_data = _mfg_data_from_cache(hass, address)
+    detected_model = detect_model_from_mfg_data(mfr_data)
     if detected_model and detected_model != model:
         _LOGGER.warning(
             "Re-detected device at %s as '%s' (was '%s') — updating config entry",
@@ -56,6 +59,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             entry, data={**entry.data, "model": detected_model},
         )
         model = detected_model
+
+    # The manufacturer's model code goes into the device registry. A
+    # connected device does not advertise, so keep the last one seen.
+    model_id = model_id_from_mfg_data(mfr_data)
+    if model_id and model_id != entry.data.get(CONF_MODEL_ID):
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, CONF_MODEL_ID: model_id},
+        )
+    model_id = entry.data.get(CONF_MODEL_ID)
 
     command_interval = entry.options.get(
         CONF_COMMAND_INTERVAL, DEFAULT_COMMAND_INTERVAL
@@ -89,6 +101,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         model,
         bind_uuid=bind_uuid,
         command_interval_ms=command_interval,
+        model_id=model_id,
         phantom_threshold=phantom_threshold,
         phantom_debounce=phantom_debounce,
         phantom_sustain=phantom_sustain,
@@ -270,14 +283,12 @@ def _async_cleanup_stale_registry(
                 dev_reg.async_remove_device(device.id)
 
 
-def _detect_model_from_cache(hass: HomeAssistant, address: str) -> str | None:
-    """Look up the device's current model from cached BLE advertisements."""
+def _mfg_data_from_cache(hass: HomeAssistant, address: str) -> bytes | None:
+    """Return the ISDT manufacturer data from cached BLE advertisements."""
     service_info = async_last_service_info(hass, address, connectable=True)
     if service_info is None:
         return None
-    return detect_model_from_mfg_data(
-        service_info.manufacturer_data.get(ISDT_MANUFACTURER_ID)
-    )
+    return service_info.manufacturer_data.get(ISDT_MANUFACTURER_ID)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

@@ -135,6 +135,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         model="C4 Air",
         bind_uuid: bytes | None = None,
         command_interval_ms: int = DEFAULT_COMMAND_INTERVAL,
+        model_id: str | None = None,
         phantom_threshold: float = DEFAULT_PHANTOM_THRESHOLD,
         phantom_debounce: float = DEFAULT_PHANTOM_DEBOUNCE,
         phantom_sustain: float = DEFAULT_PHANTOM_SUSTAIN,
@@ -147,6 +148,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         )
         self.address = address
         self.model = model
+        self.model_id = model_id
         self.device_type = get_device_type(model)
         self.adapter_protocol = (
             get_adapter_protocol(model)
@@ -1130,9 +1132,6 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         """Update device registry with hardware/firmware info."""
         from homeassistant.helpers import device_registry as dr
 
-        if not self.hw_version and not self.sw_version:
-            return
-
         from .helpers import async_get_own_device
 
         registry = dr.async_get(self.hass)
@@ -1142,21 +1141,27 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             return
 
         updates = {}
-        if self.sw_version:
-            updates["sw_version"] = self.sw_version
-        if self.hw_version:
-            updates["hw_version"] = self.hw_version
-        if self.serial_number:
-            updates["serial_number"] = self.serial_number
-        elif device.serial_number:
-            # Earlier versions stored the model name as serial number
-            updates["serial_number"] = None
+        if self.model_id and device.model_id != self.model_id:
+            updates["model_id"] = self.model_id
+        # Without hardware info (HardwareInfoResp timed out) leave the
+        # hardware fields as they are, the serial number included.
+        if self.hw_version or self.sw_version:
+            if self.sw_version:
+                updates["sw_version"] = self.sw_version
+            if self.hw_version:
+                updates["hw_version"] = self.hw_version
+            if self.serial_number:
+                updates["serial_number"] = self.serial_number
+            elif device.serial_number:
+                # Earlier versions stored the model name as serial number
+                updates["serial_number"] = None
 
         if updates:
             registry.async_update_device(device.id, **updates)
             self._device_registry_updated = True
             _LOGGER.info(
-                "Updated device registry: SW=%s, HW=%s, Serial=%s",
+                "Updated device registry: model ID=%s, SW=%s, HW=%s, Serial=%s",
+                self.model_id,
                 self.sw_version,
                 self.hw_version,
                 self.serial_number,
