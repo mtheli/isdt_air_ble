@@ -14,11 +14,11 @@ from .const import (
     CONF_PHANTOM_DEBOUNCE,
     CONF_PHANTOM_SUSTAIN,
     CONF_PHANTOM_THRESHOLD,
-    CONF_SCAN_INTERVAL,
+    CONF_COMMAND_INTERVAL,
     DEFAULT_PHANTOM_DEBOUNCE,
     DEFAULT_PHANTOM_SUSTAIN,
     DEFAULT_PHANTOM_THRESHOLD,
-    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_COMMAND_INTERVAL,
     DOMAIN,
     DeviceType,
     ISDT_MANUFACTURER_ID,
@@ -57,7 +57,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         model = detected_model
 
-    scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    command_interval = entry.options.get(
+        CONF_COMMAND_INTERVAL, DEFAULT_COMMAND_INTERVAL
+    )
     phantom_threshold = entry.options.get(
         CONF_PHANTOM_THRESHOLD, DEFAULT_PHANTOM_THRESHOLD
     )
@@ -85,8 +87,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         address,
         model,
-        scan_interval,
         bind_uuid=bind_uuid,
+        command_interval_ms=command_interval,
         phantom_threshold=phantom_threshold,
         phantom_debounce=phantom_debounce,
         phantom_sustain=phantom_sustain,

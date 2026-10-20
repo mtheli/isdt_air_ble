@@ -29,7 +29,7 @@ from .const import (
     CONF_PHANTOM_DEBOUNCE,
     CONF_PHANTOM_SUSTAIN,
     CONF_PHANTOM_THRESHOLD,
-    CONF_SCAN_INTERVAL,
+    CONF_COMMAND_INTERVAL,
     CHAR_UUID_AF01,
     CHAR_UUID_AF02,
     CMD_BIND_REQ,
@@ -37,7 +37,9 @@ from .const import (
     DEFAULT_PHANTOM_DEBOUNCE,
     DEFAULT_PHANTOM_SUSTAIN,
     DEFAULT_PHANTOM_THRESHOLD,
-    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_COMMAND_INTERVAL,
+    MAX_COMMAND_INTERVAL,
+    MIN_COMMAND_INTERVAL,
     DEVICE_MODEL_MAP,
     DOMAIN,
     DeviceType,
@@ -94,9 +96,12 @@ class ISDTOptionsFlow(OptionsFlowWithReload):
 
         schema_dict: dict[Any, Any] = {
             vol.Required(
-                CONF_SCAN_INTERVAL,
-                default=options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-            ): vol.All(vol.Coerce(int), vol.Range(min=3, max=300)),
+                CONF_COMMAND_INTERVAL,
+                default=options.get(CONF_COMMAND_INTERVAL, DEFAULT_COMMAND_INTERVAL),
+            ): vol.All(
+                vol.Coerce(int),
+                vol.Range(min=MIN_COMMAND_INTERVAL, max=MAX_COMMAND_INTERVAL),
+            ),
         }
 
         # Phantom-load filter only makes sense for adapters (MASS2 etc.),

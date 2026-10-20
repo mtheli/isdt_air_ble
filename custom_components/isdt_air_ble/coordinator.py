@@ -1,7 +1,7 @@
 """Data update coordinator for ISDT Air BLE charger.
 
 Uses a persistent BLE connection with continuous command cycling.
-Commands are sent one at a time every 100ms in an infinite loop.
+Commands are sent one at a time, 100 ms apart by default, in an infinite loop.
 Data is pushed to Home Assistant at the configured scan interval.
 """
 
@@ -43,7 +43,7 @@ from .const import (
     DEFAULT_PHANTOM_DEBOUNCE,
     DEFAULT_PHANTOM_SUSTAIN,
     DEFAULT_PHANTOM_THRESHOLD,
-    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_COMMAND_INTERVAL,
     DeviceType,
     MASS2_FRAME_HEADER,
     MASS2_PORT_COUNT,
@@ -76,9 +76,6 @@ _RAW_LOGGER.setLevel(logging.WARNING)  # silent unless explicitly enabled
 # Backoff limits for reconnection attempts
 _BACKOFF_MIN = 5
 _BACKOFF_MAX = 300
-
-# Command interval (100ms between commands)
-_CMD_INTERVAL = 0.1
 
 # Phantom-filter: low-power threshold for the sustained-active path.
 # Below this, a port is considered definitely phantom/off regardless
@@ -136,8 +133,8 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         hass,
         address,
         model="C4 Air",
-        scan_interval=DEFAULT_SCAN_INTERVAL,
         bind_uuid: bytes | None = None,
+        command_interval_ms: int = DEFAULT_COMMAND_INTERVAL,
         phantom_threshold: float = DEFAULT_PHANTOM_THRESHOLD,
         phantom_debounce: float = DEFAULT_PHANTOM_DEBOUNCE,
         phantom_sustain: float = DEFAULT_PHANTOM_SUSTAIN,
@@ -157,7 +154,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             else None
         )
         self.channel_count = get_channel_count(model) if self.device_type == DeviceType.CHARGER else 0
-        self.scan_interval_seconds = scan_interval
+        self.command_interval = command_interval_ms / 1000
         self.phantom_threshold = phantom_threshold
         self.phantom_debounce = phantom_debounce
         self.phantom_sustain = phantom_sustain
@@ -290,8 +287,9 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
     async def _live_monitoring_loop(self):
         """Continuous command loop for live data polling.
 
-        Sends one command every 100ms in a circular fashion.  After each
-        full cycle (19 commands ≈ 1.9s), responses are collected, parsed,
+        Sends one command every command_interval (100 ms by default) in a
+        circular fashion.  After each full cycle (19 commands ≈ 1.9s at
+        100 ms), responses are collected, parsed,
         and pushed to HA if enough time has passed since the last push.
         """
         backoff = _BACKOFF_MIN
@@ -369,7 +367,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 await self._client.write_gatt_char(
                     CHAR_UUID_AF01, cmd, response=False
                 )
-                await asyncio.sleep(_CMD_INTERVAL)
+                await asyncio.sleep(self.command_interval)
 
                 # Increment command index for next cycle
                 cmd_index = (cmd_index + 1) % len(self._commands)

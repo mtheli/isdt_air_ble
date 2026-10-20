@@ -33,8 +33,13 @@ class ChargeSessionAction(StrEnum):
     KEEP = "keep"      # keep the timestamp already latched for this session
 
 # Options
-CONF_SCAN_INTERVAL = "scan_interval"
-DEFAULT_SCAN_INTERVAL = 5  # seconds
+# Pause between two commands of the poll cycle. 100 ms matches the
+# manufacturer's app. Some chargers skip commands that arrive too close
+# together on a weaker link, so it can be raised.
+CONF_COMMAND_INTERVAL = "command_interval"
+DEFAULT_COMMAND_INTERVAL = 100  # milliseconds
+MIN_COMMAND_INTERVAL = 100
+MAX_COMMAND_INTERVAL = 1000
 
 # Adapter phantom-load filter (MASS2 etc.)
 # Charging pads in standby periodically pulse small amounts of power
