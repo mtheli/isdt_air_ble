@@ -186,6 +186,52 @@ def parse_charger_responses(responses: list[bytes], num_channels: int = 6, model
     return parsed, alarm_tone_on
 
 
+class ChargerValueHold:
+    """Keep charger values through cycles in which their response is missing.
+
+    The charger does not answer every command of a cycle. On a weaker link
+    a fifth of the responses can be missing, spread over all channels and
+    commands. Without a hold, each gap blanked the slot for one cycle: its
+    status went unknown and its current dropped to 0 until the next cycle
+    brought the value back.
+
+    The gaps come in runs: a single response stayed away for up to eight
+    cycles in a row. A value is held for up to ``max_missed`` cycles, about
+    30 seconds by default, then dropped. A removed battery still shows at
+    once, because the charger reports it in a WorkState response that does
+    arrive, and a lost connection shows through availability.
+    """
+
+    def __init__(self, max_missed: int = 15) -> None:
+        self._max_missed = max_missed
+        self._values: dict[int, dict] = {}
+        self._missed: dict[int, dict[str, int]] = {}
+
+    def reset(self) -> None:
+        """Forget all held values, e.g. after a reconnect."""
+        self._values.clear()
+        self._missed.clear()
+
+    def apply(self, parsed: dict) -> dict:
+        """Return ``parsed`` with missing values filled from earlier cycles."""
+        merged = {}
+        for ch, values in parsed.items():
+            held = self._values.setdefault(ch, {})
+            missed = self._missed.setdefault(ch, {})
+            for key in list(held):
+                if key in values:
+                    continue
+                missed[key] = missed.get(key, 0) + 1
+                if missed[key] > self._max_missed:
+                    del held[key]
+                    del missed[key]
+            for key, value in values.items():
+                held[key] = value
+                missed[key] = 0
+            merged[ch] = dict(held)
+        return merged
+
+
 def parse_electric(data: bytes) -> dict:
     """Parse ElectricResp (CMD RESP_ELECTRIC): voltages, currents, cell voltages.
 

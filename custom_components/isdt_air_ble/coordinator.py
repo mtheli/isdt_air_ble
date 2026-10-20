@@ -60,6 +60,7 @@ from .const import (
     get_device_type,
 )
 from .parser import (
+    ChargerValueHold,
     build_mass2_set_time_req,
     build_mass2_settings_set_req,
     parse_charger_responses,
@@ -220,6 +221,9 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
 
         # Change detection: only push to HA when sensor data actually changed
         self._last_pushed_data: dict | None = None
+
+        # Charger values survive cycles in which their response is missing
+        self._charger_hold = ChargerValueHold()
 
     @property
     def alarm_tone_on(self) -> bool | None:
@@ -442,7 +446,9 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             parsed = parsed_ports
         else:
             parsed, alarm_tone_on = parse_charger_responses(responses, self.channel_count, self.model)
-            self._alarm_tone_on = alarm_tone_on
+            parsed = self._charger_hold.apply(parsed)
+            if alarm_tone_on is not None:
+                self._alarm_tone_on = alarm_tone_on
 
         # Fetch hardware info if not yet done
         if not self._hw_info_fetched:
@@ -655,6 +661,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             # Reset reassembly buffer + settings request flag on every (re)connect
             self._mass2_buffer = bytearray()
             self._mass2_settings_requested = False
+            self._charger_hold.reset()
             await asyncio.sleep(1.0)
 
             await self._setup_notifications()
