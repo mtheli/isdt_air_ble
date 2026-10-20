@@ -6,8 +6,13 @@ from homeassistant.components.bluetooth import async_last_service_info
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    config_validation as cv,
+    device_registry as dr,
+    entity_registry as er,
+)
 from homeassistant.helpers.event import async_track_device_registry_updated_event
+from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     CONF_BIND_UUID,
@@ -32,15 +37,33 @@ from .const import (
     should_inherit_area,
 )
 from .coordinator import ISDTDataUpdateCoordinator
+from .frontend import (
+    async_ensure_card_resource,
+    async_register_card,
+    async_remove_card_resource,
+)
 from .helpers import async_get_own_device
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SWITCH, Platform.SELECT, Platform.UPDATE]
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the component (once per run, independent of entries)."""
+    # Serve the bundled Lovelace card on every dashboard.
+    await async_register_card(hass)
+    return True
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up ISDT Air BLE from a config entry."""
+    # Removing the last entry deletes the card's Lovelace resource, so a
+    # later re-add must restore it without a restart.
+    await async_ensure_card_resource(hass)
+
     address = entry.data["address"]
     model = entry.data.get("model", "C4 Air")
 
@@ -300,3 +323,19 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.async_shutdown()
 
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Drop the card's Lovelace resource when the last entry is removed.
+
+    Disabled entries count as remaining: they still need the card once they
+    are enabled again. Without any entry the resource would 404 once the
+    integration no longer serves the static path.
+    """
+    remaining = [
+        other
+        for other in hass.config_entries.async_entries(DOMAIN)
+        if other.entry_id != entry.entry_id
+    ]
+    if not remaining:
+        await async_remove_card_resource(hass)

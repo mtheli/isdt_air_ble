@@ -31,9 +31,16 @@ Supports the **C4 Air** (6-channel charger), **A8 Air** (8-channel charger), **A
 
 ## Lovelace Card
 
-A matching dashboard card is available: **[ISDT Charger Card](https://github.com/mtheli/isdt_air_card)** — battery-style slots with live charge timer, connection indicator, and full HA theme support.
+A dashboard card, the **ISDT Charger Card**, ships with this integration: battery-style slots with live charge timer, connection indicator, and full HA theme support. No separate installation and no dashboard resource setup needed. The integration registers the card itself (you'll see one entry under *Settings → Dashboards → Resources*, which it keeps up to date). Add it via the dashboard card picker or in YAML:
+
+```yaml
+type: custom:isdt-charger-card
+device_id: <your-device-id>
+```
 
 ![ISDT Charger Card](images/lovelace_card.png)
+
+> **Upgrading from the standalone card?** The card was previously installed separately from [isdt_air_card](https://github.com/mtheli/isdt_air_card). If that copy is still installed, remove it: in HACS remove *ISDT Charger Card* (this also removes the dashboard resource), or delete the manually added resource under *Settings → Dashboards → Resources*. A leftover standalone copy can shadow the bundled, up-to-date card; the integration raises a repair issue if it finds one. Your dashboards keep working unchanged, the card type stays `custom:isdt-charger-card`. Card development continues in that repository; releases ship here.
 
 ## Supported Devices
 
