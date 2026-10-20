@@ -33,9 +33,9 @@ class ChargeSessionAction(StrEnum):
     KEEP = "keep"      # keep the timestamp already latched for this session
 
 # Options
-# Pause between two commands of the poll cycle. 100 ms matches the
-# manufacturer's app. Some chargers skip commands that arrive too close
-# together on a weaker link, so it can be raised.
+# Pause between two commands of the poll cycle, 100 ms by default. Some
+# chargers skip commands that arrive too close together on a weaker link,
+# so it can be raised.
 CONF_COMMAND_INTERVAL = "command_interval"
 DEFAULT_COMMAND_INTERVAL = 100  # milliseconds
 MIN_COMMAND_INTERVAL = 100

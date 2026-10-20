@@ -151,12 +151,14 @@ Then restart Home Assistant.
 
 ## Configuration
 
-After setup, you can adjust the **poll interval** via the integration options:
+After setup, you can adjust the **command interval** via the integration options:
 
 1. Go to **Settings → Devices & Services**
 2. Find the ISDT device entry
 3. Click **Configure**
-4. Set the poll interval (default: 5 seconds, range: 3–300)
+4. Set the command interval (default: 100 ms, range: 100–1000)
+
+The command interval is the pause between two Bluetooth commands while polling. Raise it if charger values drop out every few seconds: on a weaker link some chargers skip commands that arrive too close together. Readings then update less often.
 
 ## Blueprints
 
