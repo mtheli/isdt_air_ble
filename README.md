@@ -26,6 +26,7 @@ Supports the **C4 Air** (6-channel charger), **A8 Air** (8-channel charger), **A
 - [Blueprints](#blueprints)
   - [Charging Completion](#charging-completion)
 - [BLE Protocol](#ble-protocol)
+- [Related Projects](#related-projects)
 
 ---
 
@@ -229,6 +230,10 @@ Both chargers and the MASS2 adapter use a single GATT service with two character
 Chargers run a 19-command cycle (1 alarm-tone + 6 channels × 3 commands) at 100 ms intervals. The MASS2 uses a single WorkStatus poll per cycle. BLE notifications for the MASS2 are reassembled across fragments to handle the default 23-byte ATT MTU correctly.
 
 For a detailed technical description of the BLE protocol including packet formats, command reference, and timing, see [PROTOCOL.md](PROTOCOL.md).
+
+## Related Projects
+
+- [ISDT Charge Utility](https://github.com/DittelHome/ISDT-Charge-Utility) by @DittelHome – standalone Windows/Linux app to monitor and control ISDT Air chargers (C4 Air, A4 Air, A8 Air), including setting charge parameters. Its [PROTOCOL.md](https://github.com/DittelHome/ISDT-Charge-Utility/blob/main/PROTOCOL.md) also documents the write commands.
 
 ## Disclaimer
 
