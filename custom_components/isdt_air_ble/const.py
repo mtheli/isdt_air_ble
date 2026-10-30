@@ -184,23 +184,33 @@ ISDT_MANUFACTURER_ID = 43962  # 0xABBA
 
 # Device model lookup from manufacturer_data bytes [2:6]
 DEVICE_MODEL_MAP = {
-    "01010000": "NP2 Air",
-    "01020000": "LP2 Air",
+    "01010000": "K4",
+    "81010000": "K4",
+    "01020000": "X16",
     "01030000": "Air 8",
     "01040000": "K2 Air",
-    "01050000": "608PD",
-    "01060000": "K4",
+    "01050000": "NP2 Air",
+    "81050000": "NP2 Air",
+    "01060000": "LP2 Air",
+    "81060000": "LP2 Air",
     "01070000": "C4 Air",
     "01080000": "Power 200",
+    "010b0000": "PB10DW",
+    "010b0001": "PB10DW",
+    "010c0000": "PB50DW",
     "010d0000": "Power 200H",
     "010e0000": "Power 200X",
+    "010f0000": "A4 Air",
+    "810f0000": "A4 Air",
     "010f00a8": "A8 Air",
+    "810f00a8": "A8 Air",
     "01100000": "PB70W",
     "01100001": "PB70W",
     "01110000": "EDGE",
-    "01120000": "PB100W",
-    "01120001": "PB100W",
-    "81c00000": "PB10DW",
+    "01120000": "PB25DW",
+    "01120001": "PB25DW",
+    "01c00000": "608PD",
+    "81c00000": "608PD",
     "81c00100": "PB25DW",
     "81c00200": "PB50DW",
     "01350000": "MASS2",
@@ -232,6 +242,8 @@ MODEL_CHANNEL_COUNT_MAP: dict[str, int] = {
     "A4 Air": 4,
     "K2 Air": 2,  # Two-slot round-cell charger
     "Air 8": 1,   # Single LiPo pack port (up to 6 cells on one channel)
+    "NP2 Air": 2,
+    "LP2 Air": 2,
     # Default for most chargers is 6 channels
 }
 

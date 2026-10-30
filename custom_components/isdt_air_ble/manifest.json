@@ -2,7 +2,8 @@
   "domain": "isdt_air_ble",
   "name": "ISDT Air BLE",
   "bluetooth": [
-    { "service_uuid": "0000af00-0000-1000-8000-00805f9b34fb" }
+    { "service_uuid": "0000af00-0000-1000-8000-00805f9b34fb" },
+    { "manufacturer_id": 43962, "manufacturer_data_start": [175, 250] }
   ],
   "codeowners": ["@mtheli"],
   "config_flow": true,

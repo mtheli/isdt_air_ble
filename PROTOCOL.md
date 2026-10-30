@@ -304,18 +304,27 @@ The device model is identified from bytes 2–5 of the manufacturer data payload
 
 | Bytes [2:6] | Model |
 |-------------|-------|
-| `01010000` | NP2 Air |
-| `01020000` | LP2 Air |
-| `01030000` | C4 Air |
-| `01040000` | C4 EVO |
-| `01050000` | 608PD |
-| `01060000` | K4 |
+| `01010000`, `81010000` | K4 |
+| `01020000` | X16 |
+| `01030000` | Air 8 |
+| `01040000` | K2 Air |
+| `01050000`, `81050000` | NP2 Air |
+| `01060000`, `81060000` | LP2 Air |
 | `01070000` | C4 Air |
 | `01080000` | Power 200 |
-| `010f00a8` | A8 Air |
-| `01100000` | PB70W |
+| `010b0000`, `010b0001` | PB10DW |
+| `010c0000` | PB50DW |
+| `010d0000` | Power 200H |
+| `010e0000` | Power 200X |
+| `010f0000`, `810f0000` | A4 Air |
+| `010f00a8`, `810f00a8` | A8 Air |
+| `01100000`, `01100001` | PB70W |
 | `01110000` | EDGE |
-| `01120000` | PB100W |
+| `01120000`, `01120001` | PB25DW |
+| `01c00000`, `81c00000` | 608PD |
+| `01350000` | MASS2 |
+
+Discovery matches either the service UUID `0000af00-…` or manufacturer data with company ID `0xABBA` starting with `af fa`, since not every model includes the service UUID in its advertisement.
 
 ## A8 Air Protocol Differences
 

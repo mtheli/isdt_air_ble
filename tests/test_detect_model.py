@@ -34,6 +34,24 @@ def test_c4air_id_still_maps_to_c4air():
     assert detect_model_from_mfg_data(mfg) == "C4 Air"
 
 
+def test_k4_id_maps_to_k4():
+    """The K4 advertises 01010000 (issue #11), not 01060000."""
+    mfg = bytes.fromhex("affa01010000000000000000000000000000")
+    assert detect_model_from_mfg_data(mfg) == "K4"
+
+
+def test_np2_and_lp2_ids():
+    """NP2 Air and LP2 Air sit at 0105/0106, in both ID variants."""
+    for model_id, model in (
+        ("01050000", "NP2 Air"),
+        ("81050000", "NP2 Air"),
+        ("01060000", "LP2 Air"),
+        ("81060000", "LP2 Air"),
+    ):
+        mfg = bytes.fromhex("affa" + model_id + "0000000000")
+        assert detect_model_from_mfg_data(mfg) == model
+
+
 # --- Fallback: ASCII name from advertisement ----------------------------------
 
 

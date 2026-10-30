@@ -55,8 +55,8 @@ device_id: <your-device-id>
 | ISDT Air 8 | 1S–8S LiPo Balance Charger (single channel, 8 A) | Tested ✓ ([@TRES9000](https://github.com/TRES9000), 6S pack, [#2](https://github.com/mtheli/isdt_air_ble/issues/2)) |
 | ISDT K2 Air | Dual-Channel LiPo Balance Charger (2 × 1S–6S, 20 A per channel) | Testing in progress ([@Mngnt](https://github.com/Mngnt), [#3](https://github.com/mtheli/isdt_air_ble/issues/3)) |
 | ISDT Power 200 / 200H / 200X | Desktop Power Supply (wireless pad + 4 USB ports) | Tested ✓ ([@Megachip](https://github.com/Megachip), 200H, [#5](https://github.com/mtheli/isdt_air_ble/issues/5)) |
-| ISDT NP2 Air | Charger | Untested |
-| ISDT LP2 Air | Charger | Untested |
+| ISDT NP2 Air | 2-Channel Charger | Untested |
+| ISDT LP2 Air | 2-Channel Charger | Untested |
 | ISDT K4 | Charger | Untested |
 | ISDT 608PD | Charger | Untested |
 
