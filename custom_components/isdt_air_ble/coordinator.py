@@ -1,8 +1,10 @@
 """Data update coordinator for ISDT Air BLE charger.
 
 Uses a persistent BLE connection with continuous command cycling.
-Commands are sent one at a time, 100 ms apart by default, in an infinite loop.
-Data is pushed to Home Assistant at the configured scan interval.
+Commands are sent one at a time in an infinite loop. The next command only
+goes out once the previous one was answered (or its response timed out),
+at least 100 ms apart by default. A response watchdog drops the connection
+when the device stops answering.
 """
 
 import asyncio
@@ -68,6 +70,7 @@ from .parser import (
     parse_mass2_responses,
     parse_ps200_responses,
 )
+from .watchdog import ResponseStall, ResponseWatchdog
 
 _LOGGER = logging.getLogger(__name__)
 _RAW_LOGGER = logging.getLogger(__name__ + ".raw")
@@ -76,6 +79,21 @@ _RAW_LOGGER.setLevel(logging.WARNING)  # silent unless explicitly enabled
 # Backoff limits for reconnection attempts
 _BACKOFF_MIN = 5
 _BACKOFF_MAX = 300
+
+# Request/response pacing: how long to wait for the answer to a command
+# before moving on. Adapters answer with one larger frame per command.
+_RESPONSE_TIMEOUT_CHARGER = 1.0  # seconds
+_RESPONSE_TIMEOUT_ADAPTER = 2.0  # seconds
+# Adapters: extra pause at the end of each poll cycle, unchanged from the
+# previous fixed pacing so the update rate stays the same.
+_ADAPTER_CYCLE_MIN = 0.5  # seconds, on top of command_interval
+
+# Response watchdog: drop the link when the device stops answering, before
+# unacknowledged writes pile up in the host controller.
+_STALL_MAX_MISSES_CHARGER = 8
+_STALL_MAX_MISSES_ADAPTER = 3
+_STALL_MAX_SILENCE = 10.0  # seconds without any response
+_STALL_COOLDOWN = 10.0  # seconds to wait after dropping a stalled link
 
 # Phantom-filter: low-power threshold for the sustained-active path.
 # Below this, a port is considered definitely phantom/off regardless
@@ -185,6 +203,20 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         self._response_queue: asyncio.Queue = asyncio.Queue(maxsize=200)
         self._notification_started = False
 
+        # Set by the notification handlers whenever a (complete) response
+        # arrives; the command loop waits on it before sending the next one.
+        self._response_event = asyncio.Event()
+        is_adapter = self.device_type == DeviceType.ADAPTER
+        self._response_timeout = (
+            _RESPONSE_TIMEOUT_ADAPTER if is_adapter else _RESPONSE_TIMEOUT_CHARGER
+        )
+        self._watchdog = ResponseWatchdog(
+            max_consecutive_misses=(
+                _STALL_MAX_MISSES_ADAPTER if is_adapter else _STALL_MAX_MISSES_CHARGER
+            ),
+            max_silence=_STALL_MAX_SILENCE,
+        )
+
         # Notification reassembly buffer for MASS2 (BLE notifications can be
         # fragmented when MTU is small — a 59-byte WorkStatus response will
         # arrive as 3 notifications with a 23-byte MTU). We accumulate the
@@ -289,10 +321,16 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
     async def _live_monitoring_loop(self):
         """Continuous command loop for live data polling.
 
-        Sends one command every command_interval (100 ms by default) in a
-        circular fashion.  After each full cycle (19 commands ≈ 1.9s at
-        100 ms), responses are collected, parsed,
-        and pushed to HA if enough time has passed since the last push.
+        Sends one command at a time in a circular fashion. The next command
+        goes out once the previous one was answered or its response timed
+        out, but never sooner than command_interval (100 ms by default).
+        After each full cycle (19 commands for a 6-slot charger), responses
+        are collected, parsed, and pushed to HA if enough time has passed
+        since the last push.
+
+        If the device stops answering, the response watchdog raises
+        ResponseStall: the link is dropped cleanly and re-established after
+        a cooldown instead of writing into a dead connection.
         """
         backoff = _BACKOFF_MIN
         cmd_index = 0
@@ -366,27 +404,31 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                     self._mass2_buffer.clear()
 
                 cmd = self._commands[cmd_index]
-                await self._client.write_gatt_char(
-                    CHAR_UUID_AF01, cmd, response=False
+                await self._send_and_wait(
+                    cmd, cycle_end=cmd_index == len(self._commands) - 1
                 )
-                await asyncio.sleep(self.command_interval)
 
                 # Increment command index for next cycle
                 cmd_index = (cmd_index + 1) % len(self._commands)
 
                 # After cycle completion, collect responses and push data
                 if cmd_index == 0:
-                    # Adapter has only 1 command per cycle — wait for
-                    # the response before collecting (matches app behavior)
-                    if self.device_type == DeviceType.ADAPTER:
-                        await asyncio.sleep(0.5)
-
                     await self._collect_and_push(last_push_time)
                     last_push_time = asyncio.get_event_loop().time()
 
             except asyncio.CancelledError:
                 _LOGGER.debug("Live monitoring cancelled")
                 raise
+            except ResponseStall as err:
+                _LOGGER.warning(
+                    "%s stopped answering (%s) – dropping the connection, "
+                    "reconnecting in %ds",
+                    self.address,
+                    err,
+                    _STALL_COOLDOWN,
+                )
+                await self._disconnect()
+                await asyncio.sleep(_STALL_COOLDOWN)
             except Exception as err:
                 _LOGGER.warning(
                     "Live monitoring error: %s: %s – waiting %ds before reconnect",
@@ -404,6 +446,47 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 except asyncio.TimeoutError:
                     pass
                 backoff = min(backoff * 2, _BACKOFF_MAX)
+
+    async def _send_and_wait(self, cmd: bytearray, cycle_end: bool = False) -> None:
+        """Send one command and wait for its response (or a timeout).
+
+        Only one command is in flight at a time: the device sends at most one
+        notification per connection event, so writing ahead of its answers
+        only queues packets in the host controller.
+        """
+        started = time.monotonic()
+        self._response_event.clear()
+        await self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False)
+
+        try:
+            async with asyncio.timeout(self._response_timeout):
+                await self._response_event.wait()
+        except TimeoutError:
+            self._watchdog.on_miss()
+            _LOGGER.debug(
+                "No response to %s within %.1fs (%d in a row)",
+                cmd.hex(" "),
+                self._response_timeout,
+                self._watchdog.consecutive_misses,
+            )
+
+        reason = self._watchdog.check(time.monotonic())
+        if reason:
+            raise ResponseStall(reason)
+
+        # Keep the configured minimum spacing; adapters additionally pause at
+        # the end of each cycle as before, so the update rate does not change.
+        min_spacing = self.command_interval
+        if self.device_type == DeviceType.ADAPTER and cycle_end:
+            min_spacing += _ADAPTER_CYCLE_MIN
+        remaining = min_spacing - (time.monotonic() - started)
+        if remaining > 0:
+            await asyncio.sleep(remaining)
+
+    def _on_response(self) -> None:
+        """Note that a response arrived (called from notification handlers)."""
+        self._watchdog.on_response(time.monotonic())
+        self._response_event.set()
 
     async def _collect_and_push(self, last_push_time: float):
         """Collect queued responses, parse, and push to HA."""
@@ -668,6 +751,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             await self._send_bind_request()
             self._connected = True
             self._connect_time = time.monotonic()
+            self._watchdog.reset(self._connect_time)
             _LOGGER.debug("Persistent connection established to %s", self.address)
 
             # Fetch hardware info once
@@ -743,6 +827,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                     self._response_queue.put_nowait(data)
                 except asyncio.QueueFull:
                     _LOGGER.warning("Response queue full, dropping packet")
+                self._on_response()
 
         await self._client.start_notify(CHAR_UUID_AF01, notification_callback)
         self._notification_started = True
@@ -843,6 +928,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 self._response_queue.put_nowait(response)
             except asyncio.QueueFull:
                 _LOGGER.warning("Response queue full, dropping packet")
+            self._on_response()
 
     async def _send_bind_request(self):
         """Send bind request on AF02.
