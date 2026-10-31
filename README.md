@@ -45,7 +45,7 @@ device_id: <your-device-id>
 
 ## Supported Devices
 
-> **Note:** This integration has been tested with the **ISDT C4 Air**, **ISDT A8 Air** (round-cell chargers), the **ISDT MASS2** (USB power adapter), and the **ISDT Air 8** (LiPo balance charger). Support for the **K2 Air** was added in v0.9.1 and is currently being validated by a community tester. Other ISDT devices with BLE support may work but are untested.
+> **Note:** This integration has been tested with the **ISDT C4 Air**, **ISDT A8 Air**, **ISDT NP2 Air** (round-cell chargers), the **ISDT MASS2** (USB power adapter), and the **ISDT Air 8** (LiPo balance charger). Support for the **K2 Air** was added in v0.9.1 and is currently being validated by a community tester. Other ISDT devices with BLE support may work but are untested.
 
 | Model | Type | Status |
 |-------|------|--------|
@@ -55,12 +55,12 @@ device_id: <your-device-id>
 | ISDT Air 8 | 1S–8S LiPo Balance Charger (single channel, 8 A) | Tested ✓ ([@TRES9000](https://github.com/TRES9000), 6S pack, [#2](https://github.com/mtheli/isdt_air_ble/issues/2)) |
 | ISDT K2 Air | Dual-Channel LiPo Balance Charger (2 × 1S–6S, 20 A per channel) | Testing in progress ([@Mngnt](https://github.com/Mngnt), [#3](https://github.com/mtheli/isdt_air_ble/issues/3)) |
 | ISDT Power 200 / 200H / 200X | Desktop Power Supply (wireless pad + 4 USB ports) | Tested ✓ ([@Megachip](https://github.com/Megachip), 200H, [#5](https://github.com/mtheli/isdt_air_ble/issues/5)) |
-| ISDT NP2 Air | 2-Channel Charger | Untested |
+| ISDT NP2 Air | 2-Channel Charger | Tested ✓ ([@yanglu2021](https://github.com/yanglu2021), [#12](https://github.com/mtheli/isdt_air_ble/issues/12)) |
 | ISDT LP2 Air | 2-Channel Charger | Untested |
 | ISDT K4 | Charger | Untested |
 | ISDT 608PD | Charger | Untested |
 
-The integration auto-detects the device model from BLE manufacturer data and exposes the appropriate entities (6 slot sub-devices for C4 Air, 8 slot sub-devices for A8 Air, 1 pack sub-device with per-cell voltage sensors for Air 8, 8 USB port sub-devices for MASS2). Other ISDT devices using the same BLE protocol may also work — feedback and reports are welcome.
+The integration auto-detects the device model from BLE manufacturer data and exposes the appropriate entities (6 slot sub-devices for C4 Air, 8 slot sub-devices for A8 Air, 2 slot sub-devices for NP2 Air, 1 pack sub-device with per-cell voltage sensors for Air 8, 8 USB port sub-devices for MASS2). Other ISDT devices using the same BLE protocol may also work — feedback and reports are welcome.
 
 ## Features
 
