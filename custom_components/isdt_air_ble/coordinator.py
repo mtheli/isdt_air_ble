@@ -95,6 +95,12 @@ _STALL_MAX_MISSES_CHARGER = 8
 _STALL_MAX_MISSES_ADAPTER = 3
 _STALL_MAX_SILENCE = 10.0  # seconds without any response
 _STALL_COOLDOWN = 10.0  # seconds to wait after dropping a stalled link
+# Upper bound for a single GATT operation (write, start/stop notify, MTU
+# exchange). Writes without response normally return within milliseconds;
+# when the controller stops taking ACL packets, BlueZ never answers the
+# D-Bus call and the await would block the live loop forever — the
+# response watchdog only runs after the write returns.
+_GATT_OP_TIMEOUT = 5.0  # seconds
 
 # Phantom-filter: low-power threshold for the sustained-active path.
 # Below this, a port is considered definitely phantom/off regardless
@@ -457,7 +463,10 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         """
         started = time.monotonic()
         self._response_event.clear()
-        await self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False)
+        await self._gatt(
+            self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False),
+            "command write",
+        )
 
         try:
             async with asyncio.timeout(self._response_timeout):
@@ -488,6 +497,21 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         """Note that a response arrived (called from notification handlers)."""
         self._watchdog.on_response(time.monotonic())
         self._response_event.set()
+
+    async def _gatt(self, operation, what: str):
+        """Await one GATT operation, bounded by _GATT_OP_TIMEOUT.
+
+        Raises ResponseStall when BlueZ does not complete the operation in
+        time, so the live loop drops and re-establishes the link instead of
+        waiting forever on a connection that no longer moves data.
+        """
+        try:
+            async with asyncio.timeout(_GATT_OP_TIMEOUT):
+                return await operation
+        except TimeoutError as err:
+            raise ResponseStall(
+                f"{what} not completed within {_GATT_OP_TIMEOUT:.0f}s"
+            ) from err
 
     async def _collect_and_push(self, last_push_time: float):
         """Collect queued responses, parse, and push to HA."""
@@ -732,7 +756,9 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             backend = getattr(self._client, "_backend", None)
             if backend is not None and hasattr(backend, "_acquire_mtu"):
                 try:
-                    await backend._acquire_mtu()
+                    await self._gatt(backend._acquire_mtu(), "MTU exchange")
+                except ResponseStall:
+                    raise
                 except Exception as err:
                     _LOGGER.debug("MTU negotiation failed: %s", err)
 
@@ -767,8 +793,11 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 and not self._mass2_settings_requested
             ):
                 _LOGGER.debug("Sending MASS2 SettingsReq")
-                await self._client.write_gatt_char(
-                    CHAR_UUID_AF01, CMD_MASS2_SETTINGS_REQ, response=False
+                await self._gatt(
+                    self._client.write_gatt_char(
+                        CHAR_UUID_AF01, CMD_MASS2_SETTINGS_REQ, response=False
+                    ),
+                    "settings request",
                 )
                 self._mass2_settings_requested = True
 
@@ -830,7 +859,10 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                     _LOGGER.warning("Response queue full, dropping packet")
                 self._on_response()
 
-        await self._client.start_notify(CHAR_UUID_AF01, notification_callback)
+        await self._gatt(
+            self._client.start_notify(CHAR_UUID_AF01, notification_callback),
+            "start_notify AF01",
+        )
         self._notification_started = True
 
         await asyncio.sleep(0.5)
@@ -957,7 +989,10 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 pass
 
         try:
-            await self._client.start_notify(CHAR_UUID_AF02, af02_callback)
+            await self._gatt(
+                self._client.start_notify(CHAR_UUID_AF02, af02_callback),
+                "start_notify AF02",
+            )
             await asyncio.sleep(0.3)
 
             cmd = (
@@ -966,7 +1001,10 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 + bytearray([0x00, BIND_STATUS])
             )
             _LOGGER.debug("Sending BindReq on AF02: %s", cmd.hex(" "))
-            await self._client.write_gatt_char(CHAR_UUID_AF02, cmd, response=False)
+            await self._gatt(
+                self._client.write_gatt_char(CHAR_UUID_AF02, cmd, response=False),
+                "bind request",
+            )
 
             # Wait up to 30s for a successful BindResp.
             try:
@@ -992,12 +1030,16 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                     "Timeout waiting for BindResp on AF02 — pairing may have failed"
                 )
 
+        except ResponseStall:
+            raise
         except Exception as err:
             _LOGGER.warning("Failed to send bind request: %s", err)
 
         finally:
             try:
-                await self._client.stop_notify(CHAR_UUID_AF02)
+                await self._gatt(
+                    self._client.stop_notify(CHAR_UUID_AF02), "stop_notify AF02"
+                )
             except Exception:
                 pass
 
@@ -1079,7 +1121,10 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 return
             task_type = 0x01 if enable else 0x00
             cmd = CMD_ALARM_TONE_SET + bytearray([task_type])
-            await self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False)
+            await self._gatt(
+                self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False),
+                "alarm tone write",
+            )
             self._alarm_tone_on = enable
             _LOGGER.info("Alarm tone %s", "enabled" if enable else "disabled")
 
@@ -1103,7 +1148,10 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             new_settings.update(updates)
             cmd = build_mass2_settings_set_req(new_settings)
             _LOGGER.debug("Sending MASS2 SettingsSetReq: %s", cmd.hex(" "))
-            await self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False)
+            await self._gatt(
+                self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False),
+                "settings write",
+            )
 
             # Optimistic local update — the device usually echoes the new
             # state in the next SettingsResp anyway.
@@ -1135,8 +1183,9 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
 
         cmd = build_mass2_set_time_req(now, offset_hours, is_24h=True)
         try:
-            await self._client.write_gatt_char(
-                CHAR_UUID_AF01, cmd, response=False
+            await self._gatt(
+                self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False),
+                "set-time write",
             )
             _LOGGER.debug(
                 "MASS2 RTC set to %s (UTC%+d)",
@@ -1162,14 +1211,18 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 pass
 
         try:
-            await self._client.start_notify(
-                CHAR_UUID_AF02, hw_notification_callback
+            await self._gatt(
+                self._client.start_notify(CHAR_UUID_AF02, hw_notification_callback),
+                "start_notify AF02",
             )
             await asyncio.sleep(0.3)
 
             _LOGGER.debug("Sending HardwareInfoReq on AF02: %s", CMD_HARDWARE_INFO_REQ.hex(" "))
-            await self._client.write_gatt_char(
-                CHAR_UUID_AF02, CMD_HARDWARE_INFO_REQ, response=False
+            await self._gatt(
+                self._client.write_gatt_char(
+                    CHAR_UUID_AF02, CMD_HARDWARE_INFO_REQ, response=False
+                ),
+                "hardware info request",
             )
 
             try:
@@ -1193,12 +1246,16 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.warning("Timeout waiting for HardwareInfoResp on AF02")
                 self._hw_info_fetched = True
 
+        except ResponseStall:
+            raise
         except Exception as err:
             _LOGGER.warning("Failed to fetch hardware info: %s", err)
 
         finally:
             try:
-                await self._client.stop_notify(CHAR_UUID_AF02)
+                await self._gatt(
+                    self._client.stop_notify(CHAR_UUID_AF02), "stop_notify AF02"
+                )
             except Exception:
                 pass
 

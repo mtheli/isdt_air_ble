@@ -132,3 +132,41 @@ def test_send_and_wait_keeps_adapter_cycle_pause(monkeypatch):
         assert coord.time.monotonic() - start >= 0.19
 
     asyncio.run(run())
+
+
+def test_send_and_wait_raises_stall_when_write_never_returns(monkeypatch):
+    """BlueZ may never answer a write when the controller stops taking ACL
+    packets. The live loop must not block on it forever."""
+
+    async def run():
+        c, coord, _ = _make_coordinator(answer=True)
+        monkeypatch.setattr(coord, "_GATT_OP_TIMEOUT", 0.05)
+        c._watchdog.reset(coord.time.monotonic())
+
+        async def hanging_write(char, data, response):
+            await asyncio.Event().wait()
+
+        c._client = SimpleNamespace(write_gatt_char=hanging_write)
+        start = coord.time.monotonic()
+        with pytest.raises(ResponseStall, match="command write not completed"):
+            await c._send_and_wait(b"\x01")
+        assert coord.time.monotonic() - start < 1.0
+
+    asyncio.run(run())
+
+
+def test_gatt_passes_result_and_errors_through():
+    async def run():
+        c, coord, _ = _make_coordinator(answer=True)
+
+        async def ok():
+            return 42
+
+        async def fails():
+            raise RuntimeError("boom")
+
+        assert await c._gatt(ok(), "op") == 42
+        with pytest.raises(RuntimeError, match="boom"):
+            await c._gatt(fails(), "op")
+
+    asyncio.run(run())
