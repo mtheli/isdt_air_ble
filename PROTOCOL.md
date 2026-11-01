@@ -269,6 +269,29 @@ Offset  Length  Field                       Unit / Values
 | 5 | LiIon | 1.50V Lithium-Ion (special variant) |
 | 6 | Auto | Automatic detection |
 
+**Camera battery chargers (NP2 Air, LP2 Air):**
+
+Same frame layout, different enums. A non-zero error code overrides the work state.
+
+| Value | State | Description |
+|-------|-------|-------------|
+| 0 | empty | No battery in the slot |
+| 19 | charging | Normal charge |
+| 21, 22 | done | Fully charged (not yet confirmed on a device) |
+| other non-zero | charging | Alternative charge mode |
+
+After a battery is removed the slot reports work state 0 again, but capacity, charged mAh, duration, battery type, output voltage and charging current keep the values of the removed battery. Work state 0 alone marks the slot as empty.
+
+| Value | Battery | Charger |
+|-------|---------|---------|
+| 7 | NP-FZ100 | NP2 Air |
+| 8 | NP-FW50 | NP2 Air |
+| 9 | NP-BX1 | NP2 Air |
+| 10 | LP-E6 | LP2 Air |
+| 11 | LP-E12 | LP2 Air |
+| 12 | LP-E17 | LP2 Air |
+| 100 | none | Empty slot |
+
 ### IRReq (0x13 0xFA)
 
 Queries internal resistance per cell for a channel.

@@ -257,6 +257,7 @@ class ISDTC4StatusSensor(ISDTC4AirSensorBase):
         # Pass slot=None so it lands on the main device
         super().__init__(coordinator, translation_key, data_key, channel, slot=None)
         self._attr_translation_placeholders = {"slot": str(slot_number)}
+        self._logged_unknown: set[str] = set()
 
     @property
     def native_value(self):
@@ -265,8 +266,23 @@ class ISDTC4StatusSensor(ISDTC4AirSensorBase):
             return None
         ch = self.coordinator.data[self._channel]
         state = ch.get("work_state_str")
+        if state is None:
+            return None
         if state != "idle":
-            return state
+            if state in self._attr_options:
+                return state
+            # A work state code this model's map does not know. Report
+            # unknown instead of raising on every update, and log the raw
+            # code once so it can be added to the map.
+            if state not in self._logged_unknown:
+                self._logged_unknown.add(state)
+                _LOGGER.warning(
+                    "%s slot %s reports unmapped work state %s",
+                    self.coordinator.model,
+                    self._attr_translation_placeholders["slot"],
+                    ch.get("work_state"),
+                )
+            return None
         # Slot is idle – check if a battery is actually present
         output_v = ch.get("output_voltage", 0.0) or 0.0
         capacity = ch.get("capacity_percentage", 0) or 0
@@ -311,6 +327,8 @@ class ISDTC4BatterySensor(ISDTC4AirSensorBase):
         # Battery is present if charging, done, or in error state
         if state in ("charging", "done", "error"):
             return True
+        if state == "empty":
+            return False
         
         # For idle state, check if there's actually a battery present
         output_v = ch.get("output_voltage", 0.0) or 0.0

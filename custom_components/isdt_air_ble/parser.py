@@ -17,6 +17,9 @@ from .const import (
     AIR8_WORK_STATE_MAP,
     AIR8_BATTERY_TYPE_MAP,
     BALANCE_CHARGER_MODELS,
+    CAMERA_CHARGER_MODELS,
+    CAMERA_WORK_STATE_MAP,
+    CAMERA_BATTERY_TYPE_MAP,
     MASS2_PORT_COUNT,
     MASS2_PROTOCOL_MAP,
     PS200_DC_STATUS_CHANNEL_SIZE,
@@ -232,6 +235,40 @@ class ChargerValueHold:
         return merged
 
 
+# Values a camera charger (NP2 Air, LP2 Air) keeps reporting from the last
+# battery after it has been removed. Input voltage/current are device-wide
+# and stay untouched.
+_EMPTY_SLOT_VALUES = {
+    "capacity_percentage": 0,
+    "capacity_done": 0,
+    "energy_done": 0,
+    "energy_done_wh": 0.0,
+    "work_period": 0,
+    "work_period_ms": 0,
+    "work_period_str": "00:00:00",
+    "battery_type_str": None,
+    "work_current": 0.0,
+    "output_voltage": 0.0,
+    "charging_current": 0.0,
+    "ir_mohm": None,
+}
+
+
+def clear_empty_slots(parsed: dict) -> dict:
+    """Blank the stale values of slots the charger reports as empty.
+
+    Only camera chargers map a work state to "empty"; on every other model
+    this is a no-op. Runs after ChargerValueHold so a held value cannot
+    bring the stale reading back.
+    """
+    for values in parsed.values():
+        if values.get("work_state_str") == "empty":
+            values.update(_EMPTY_SLOT_VALUES)
+            values["cell_voltages"] = []
+            values["ir_raw"] = []
+    return parsed
+
+
 def parse_electric(data: bytes) -> dict:
     """Parse ElectricResp (CMD RESP_ELECTRIC): voltages, currents, cell voltages.
 
@@ -369,24 +406,30 @@ def parse_workstate(data: bytes, model: str = "C4 Air") -> dict:
     error_code          = int.from_bytes(data[36:38], "little")
     parallel_state      = data[38] == 1 if len(data) > 38 else None
 
-    if model in BALANCE_CHARGER_MODELS:
-        ws_map = AIR8_WORK_STATE_MAP
-        bt_map = AIR8_BATTERY_TYPE_MAP
+    if model in CAMERA_CHARGER_MODELS:
+        if error_code:
+            work_state_str = "error"
+        else:
+            work_state_str = CAMERA_WORK_STATE_MAP.get(work_state, "charging")
+        battery_type_str = CAMERA_BATTERY_TYPE_MAP.get(battery_type)
     else:
-        ws_map = WORK_STATE_MAP
-        bt_map = BATTERY_TYPE_MAP
-
-    work_state_str   = ws_map.get(work_state, f"unknown_{work_state}")
-    battery_type_str = bt_map.get(battery_type, f"unknown_{battery_type}")
+        if model in BALANCE_CHARGER_MODELS:
+            ws_map = AIR8_WORK_STATE_MAP
+            bt_map = AIR8_BATTERY_TYPE_MAP
+        else:
+            ws_map = WORK_STATE_MAP
+            bt_map = BATTERY_TYPE_MAP
+        work_state_str   = ws_map.get(work_state, f"unknown_{work_state}")
+        battery_type_str = bt_map.get(battery_type, f"unknown_{battery_type}")
 
     hours, rem = divmod(work_period, 3600)
     minutes, seconds = divmod(rem, 60)
     work_period_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
     _LOGGER.debug(
-        "Channel %d: State=%s, %d%%, %d mAh, %s (ms=%d), Type=%s",
-        channel_id, work_state_str, capacity_percentage, capacity_done,
-        work_period_str, work_period_ms, battery_type_str,
+        "Channel %d: State=%s (%d), %d%%, %d mAh, %s (ms=%d), Type=%s (%d), Error=%d",
+        channel_id, work_state_str, work_state, capacity_percentage, capacity_done,
+        work_period_str, work_period_ms, battery_type_str, battery_type, error_code,
     )
 
     return {

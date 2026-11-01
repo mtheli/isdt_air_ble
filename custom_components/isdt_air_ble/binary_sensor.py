@@ -88,7 +88,7 @@ class ISDTC4SlotActiveSensor(CoordinatorEntity, BinarySensorEntity):
         attrs = {}
 
         status = ch_data.get("work_state_str")
-        if status and status != "idle":
+        if status and status not in ("idle", "empty"):
             attrs["status"] = status
             if ch_data.get("battery_type_str"):
                 attrs["battery_type"] = ch_data["battery_type_str"]
@@ -134,6 +134,8 @@ class ISDTC4BatteryInsertedSensor(CoordinatorEntity, BinarySensorEntity):
         state = ch.get("work_state_str")
         if state in ("charging", "done", "error"):
             return True
+        if state == "empty":
+            return False
         output_v = ch.get("output_voltage", 0.0) or 0.0
         capacity = ch.get("capacity_percentage", 0) or 0
         cell_voltages = ch.get("cell_voltages") or []

@@ -179,6 +179,33 @@ AIR8_BATTERY_TYPE_MAP = {
 #   - "K2 Air" (two independent channels, 1S-6S each, parallel mode 1S-12S)
 BALANCE_CHARGER_MODELS = frozenset({"Air 8", "K2 Air"})
 
+# Camera battery chargers (NP2 Air for Sony, LP2 Air for Canon). Same wire
+# protocol as the round-cell chargers, but a different work-state enum:
+#   0      no battery in the slot
+#   19     charging (normal mode)
+#   21/22  charge done (not yet seen on a device)
+#   any other non-zero value: charging in an alternative charge mode
+# A non-zero error_code overrides the work state. After a battery is removed
+# the slot reports 0 again, but keeps the last capacity, voltage, current,
+# duration and battery type, so state 0 alone decides that the slot is empty.
+CAMERA_CHARGER_MODELS = frozenset({"NP2 Air", "LP2 Air"})
+
+CAMERA_WORK_STATE_MAP = {
+    0: "empty",
+    19: "charging",
+    21: "done",
+    22: "done",
+}
+
+CAMERA_BATTERY_TYPE_MAP = {
+    7: "NP-FZ100",
+    8: "NP-FW50",
+    9: "NP-BX1",
+    10: "LP-E6",
+    11: "LP-E12",
+    12: "LP-E17",
+}
+
 # Manufacturer data company ID (ISDT)
 ISDT_MANUFACTURER_ID = 43962  # 0xABBA
 

@@ -66,6 +66,7 @@ from .parser import (
     build_mass2_set_time_req,
     build_mass2_settings_set_req,
     parse_charger_responses,
+    clear_empty_slots,
     parse_hardware_info,
     parse_mass2_responses,
     parse_ps200_responses,
@@ -529,7 +530,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             parsed = parsed_ports
         else:
             parsed, alarm_tone_on = parse_charger_responses(responses, self.channel_count, self.model)
-            parsed = self._charger_hold.apply(parsed)
+            parsed = clear_empty_slots(self._charger_hold.apply(parsed))
             if alarm_tone_on is not None:
                 self._alarm_tone_on = alarm_tone_on
 
