@@ -15,7 +15,7 @@ Supports the **C4 Air** (6-channel charger), **A8 Air** (8-channel charger), **A
 ## Table of Contents
 
 - [Lovelace Card](#lovelace-card)
-- [Supported Devices](#supported-devices)
+- [Tested Models](#tested-models)
 - [Features](#features)
   - [Chargers (C4 Air, A8 Air)](#chargers-c4-air-a8-air)
   - [MASS2 USB Adapter](#mass2-usb-adapter)
@@ -43,24 +43,28 @@ device_id: <your-device-id>
 
 > **Upgrading from the standalone card?** The card was previously installed separately from [isdt_air_card](https://github.com/mtheli/isdt_air_card). If that copy is still installed, remove it: in HACS remove *ISDT Charger Card* (this also removes the dashboard resource), or delete the manually added resource under *Settings → Dashboards → Resources*. A leftover standalone copy can shadow the bundled, up-to-date card; the integration raises a repair issue if it finds one. Your dashboards keep working unchanged, the card type stays `custom:isdt-charger-card`. Card development continues in that repository; releases ship here.
 
-## Supported Devices
+## Tested Models
 
-> **Note:** This integration has been tested with the **ISDT C4 Air**, **ISDT A8 Air**, **ISDT NP2 Air** (round-cell chargers), the **ISDT MASS2** (USB power adapter), and the **ISDT Air 8** (LiPo balance charger). Support for the **K2 Air** was added in v0.9.1 and is currently being validated by a community tester. Other ISDT devices with BLE support may work but are untested.
+| Model | Bluetooth | Tested by |
+| :--- | :---: | :--- |
+| **Round-cell chargers** | | |
+| [C4 Air](https://www.isdt.co/c4air.html?lang=en) (6 slots) | :white_check_mark: | Maintainer |
+| [A8 Air](https://www.isdt.co/a8-air.html?lang=en) (8 slots) | :white_check_mark: | Community ([#1](https://github.com/mtheli/isdt_air_ble/issues/1), [#4](https://github.com/mtheli/isdt_air_ble/issues/4)) |
+| **Camera battery chargers** | | |
+| [NP2 Air](https://www.isdt.co/np2air.html?lang=en) (2 slots, Sony NP-FZ100 / NP-FW50 / NP-BX1) | :white_check_mark: | Community ([#12](https://github.com/mtheli/isdt_air_ble/issues/12), [#13](https://github.com/mtheli/isdt_air_ble/issues/13)) |
+| [LP2 Air](https://www.isdt.co/lp2air.html?lang=en) (2 slots, Canon LP-E6 / LP-E12 / LP-E17) | *not yet tested* | — |
+| **LiPo balance chargers** | | |
+| [Air 8](https://www.isdt.co/air8.html?lang=en) (1S–8S, single channel) | :white_check_mark: | Community ([#2](https://github.com/mtheli/isdt_air_ble/issues/2)) |
+| [K2 Air](https://www.isdt.co/k2air.html?lang=en) (2 × 1S–6S) | :white_check_mark: | Community ([#3](https://github.com/mtheli/isdt_air_ble/issues/3)) |
+| [K4](https://www.isdt.co/k4.html?lang=en) | *not yet tested* | In progress ([#11](https://github.com/mtheli/isdt_air_ble/issues/11)) |
+| [608PD](https://www.isdt.co/608pd.html?lang=en) | *not yet tested* | — |
+| **USB power adapters** | | |
+| [MASS2](https://www.isdt.co/mass2.html?lang=en) (8 USB ports) | :white_check_mark: | Maintainer |
+| [Power 200 / 200H / 200X](https://www.isdt.co/power200.html?lang=en) (wireless pad + 4 USB ports) | :white_check_mark: | Community ([#5](https://github.com/mtheli/isdt_air_ble/issues/5), 200H) |
 
-| Model | Type | Status |
-|-------|------|--------|
-| ISDT C4 Air | 6-Channel Round-Cell Charger | Tested ✓ ([@mtheli](https://github.com/mtheli)) |
-| ISDT A8 Air | 8-Channel Round-Cell Charger | Tested ✓ ([@stuartp44](https://github.com/stuartp44)) |
-| ISDT MASS2 | USB Adapter | Tested ✓ ([@mtheli](https://github.com/mtheli)) |
-| ISDT Air 8 | 1S–8S LiPo Balance Charger (single channel, 8 A) | Tested ✓ ([@TRES9000](https://github.com/TRES9000), 6S pack, [#2](https://github.com/mtheli/isdt_air_ble/issues/2)) |
-| ISDT K2 Air | Dual-Channel LiPo Balance Charger (2 × 1S–6S, 20 A per channel) | Testing in progress ([@Mngnt](https://github.com/Mngnt), [#3](https://github.com/mtheli/isdt_air_ble/issues/3)) |
-| ISDT Power 200 / 200H / 200X | Desktop Power Supply (wireless pad + 4 USB ports) | Tested ✓ ([@Megachip](https://github.com/Megachip), 200H, [#5](https://github.com/mtheli/isdt_air_ble/issues/5)) |
-| ISDT NP2 Air | 2-Channel Charger | Tested ✓ ([@yanglu2021](https://github.com/yanglu2021), [#12](https://github.com/mtheli/isdt_air_ble/issues/12)) |
-| ISDT LP2 Air | 2-Channel Charger | Untested |
-| ISDT K4 | Charger | Untested |
-| ISDT 608PD | Charger | Untested |
+Other BLE-enabled ISDT devices using the same protocol may also work. The integration auto-detects the model from the Bluetooth advertisement and creates one sub-device per slot or port (6 for the C4 Air, 8 for the A8 Air, 2 for the NP2 Air, 1 pack with per-cell voltages for the Air 8, 8 USB ports for the MASS2), with only the entities the model supports. If your model works, please [let me know](https://github.com/mtheli/isdt_air_ble/issues) so I can add it to the list!
 
-The integration auto-detects the device model from BLE manufacturer data and exposes the appropriate entities (6 slot sub-devices for C4 Air, 8 slot sub-devices for A8 Air, 2 slot sub-devices for NP2 Air, 1 pack sub-device with per-cell voltage sensors for Air 8, 8 USB port sub-devices for MASS2). Other ISDT devices using the same BLE protocol may also work — feedback and reports are welcome.
+---
 
 ## Features
 
