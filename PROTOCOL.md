@@ -277,10 +277,12 @@ Same frame layout, different enums. A non-zero error code overrides the work sta
 |-------|-------|-------------|
 | 0 | empty | No battery in the slot |
 | 19 | charging | Normal charge |
-| 21, 22 | done | Fully charged (not yet confirmed on a device) |
+| 21, 22 | done | Fully charged |
 | other non-zero | charging | Alternative charge mode |
 
 After a battery is removed the slot reports work state 0 again, but capacity, charged mAh, duration, battery type, output voltage and charging current keep the values of the removed battery. Work state 0 alone marks the slot as empty.
+
+The energy field (offset 9) is always 0 on the NP2 Air, while the charged mAh counter counts normally. These chargers get no energy sensor.
 
 | Value | Battery | Charger |
 |-------|---------|---------|

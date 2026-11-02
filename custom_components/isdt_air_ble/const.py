@@ -330,6 +330,15 @@ def supports_cell_voltages(model: str) -> bool:
     return "A8" not in model.upper()
 
 
+def supports_energy(model: str) -> bool:
+    """Whether a charger reports the charged energy (mWh) per slot.
+
+    The NP2 Air and LP2 Air send 0 in the energy field of every work-state
+    update while the mAh counter counts normally (issue #13).
+    """
+    return model not in CAMERA_CHARGER_MODELS
+
+
 def charge_session_action(
     work_state: str,
     work_period: int,
@@ -381,7 +390,8 @@ def is_stale_charger_unique_id(
 
     - per-channel entities on channels the model doesn't have,
     - per-slot entities on slots the model doesn't have,
-    - cell-voltage entities on models without per-cell data.
+    - cell-voltage entities on models without per-cell data,
+    - energy entities on models that report no energy.
     """
     prefix = f"{address}_"
     if not unique_id.startswith(prefix):
@@ -392,7 +402,10 @@ def is_stale_charger_unique_id(
     if m:
         if int(m.group(1)) >= channel_count:
             return True
-        return bool(_CELL_KEY_RE.fullmatch(m.group(2))) and not supports_cell_voltages(model)
+        key = m.group(2)
+        if key == "energy_done_wh":
+            return not supports_energy(model)
+        return bool(_CELL_KEY_RE.fullmatch(key)) and not supports_cell_voltages(model)
 
     m = _SLOT_UID_RE.match(rest)
     if m:

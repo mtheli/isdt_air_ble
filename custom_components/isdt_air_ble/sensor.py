@@ -26,6 +26,7 @@ from .const import (
     get_port_count,
     get_port_labels,
     supports_cell_voltages,
+    supports_energy,
 )
 from .helpers import main_device_info, slot_device_info, port_device_info
 
@@ -111,13 +112,6 @@ def _setup_charger_sensors(coordinator, entities):
                     channel=ch,
                     slot=slot,
                 ),
-                ISDTC4EnergySensor(
-                    coordinator,
-                    "energy_done",
-                    "energy_done_wh",
-                    channel=ch,
-                    slot=slot,
-                ),
                 ISDTC4TimeSensor(
                     coordinator,
                     "charge_time",
@@ -141,6 +135,18 @@ def _setup_charger_sensors(coordinator, entities):
                 ),
             ]
         )
+
+        # NP2 Air / LP2 Air report no energy (always 0), only mAh
+        if supports_energy(coordinator.model):
+            entities.append(
+                ISDTC4EnergySensor(
+                    coordinator,
+                    "energy_done",
+                    "energy_done_wh",
+                    channel=ch,
+                    slot=slot,
+                )
+            )
 
         # A8 Air doesn't support individual cell voltage monitoring
         if supports_cell_voltages(coordinator.model):

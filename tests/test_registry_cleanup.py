@@ -10,6 +10,7 @@ from isdt_air_ble.const import (
     get_channel_count,
     is_stale_charger_unique_id,
     supports_cell_voltages,
+    supports_energy,
 )
 
 ADDRESS = "50:54:7B:EB:D2:3A"
@@ -75,3 +76,22 @@ def test_other_device_unique_ids_untouched():
 def test_similar_keys_not_mistaken_for_cells():
     # A hypothetical key merely starting with "cell" must not be pruned.
     assert not _stale(f"{ADDRESS}_ch0_cell_balance_state")
+
+
+def test_supports_energy():
+    assert not supports_energy("NP2 Air")
+    assert not supports_energy("LP2 Air")
+    assert supports_energy("C4 Air")
+    assert supports_energy("A8 Air")
+    assert supports_energy("Air 8")
+
+
+def test_camera_charger_energy_sensor_is_stale():
+    # Issue #13: the NP2 Air always sends 0 Wh; the energy sensor created
+    # by v0.11.x and earlier is pruned, the rest of the slot is kept.
+    for model in ("NP2 Air", "LP2 Air"):
+        for ch in range(get_channel_count(model)):
+            assert _stale(f"{ADDRESS}_ch{ch}_energy_done_wh", model=model)
+            assert not _stale(f"{ADDRESS}_ch{ch}_capacity_done", model=model)
+            assert not _stale(f"{ADDRESS}_ch{ch}_work_state_str", model=model)
+    assert not _stale(f"{ADDRESS}_ch0_energy_done_wh", model="C4 Air")
