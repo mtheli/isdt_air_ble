@@ -29,7 +29,7 @@ function $d8078e452c66bdbe$export$625550452a3fa3ec(hass, key) {
 
 
 // Written by the release sync script (isdt_air_ble scripts/sync_card.sh).
-const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.12.0";
+const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.12.1";
 const $8ee5ce714273e53b$export$9b657414b7dffe40 = "bundled";
 
 
@@ -392,6 +392,12 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         const v = parseFloat(this._st(eid, null));
         return isNaN(v) ? fb : v;
     }
+    /* Session text "555 mAh / 0.81 Wh". Chargers without an energy counter
+     (NP2 Air, LP2 Air) have no energy_done entity: show mAh only. */ _sessionText(e) {
+        const mah = `${this._num(e?.capacity_done, 0).toFixed(0)} mAh`;
+        if (!e?.energy_done) return mah;
+        return `${mah} / ${this._num(e.energy_done, 0).toFixed(2)} Wh`;
+    }
     /* ── Render ─────────────────────────────────────────── */ _render() {
         if (!this._hass || !this._config) return;
         if (!this._entities) this._entities = this._findEntities(this._hass, this._config.device_id);
@@ -516,8 +522,6 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         const vol = this._num(e?.output_voltage, 0);
         const cur = this._num(e?.charging_current, 0);
         const btype = this._st(e?.battery_type, "");
-        const mah = this._num(e?.capacity_done, 0);
-        const wh = this._num(e?.energy_done, 0);
         const since = this._st(e?.charge_time, null);
         let timeStr = "\u2013";
         if (since && ![
@@ -621,7 +625,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
           ${status === "charging" || status === "done" ? `
             <div class="slot-session">
               <span class="time-val" data-entity="${e?.charge_time || ""}" ${isCharging ? `data-since="${since || ""}"` : ""}><ha-icon icon="mdi:timer-outline"></ha-icon>${timeStr}</span>
-              <span class="session-energy">${mah.toFixed(0)} mAh / ${wh.toFixed(2)} Wh</span>
+              <span class="session-energy">${this._sessionText(e)}</span>
             </div>` : ""}
         </div>
       </div>`;
@@ -710,8 +714,6 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             const pct = this._num(e?.capacity, 0);
             const vol = this._num(e?.output_voltage, 0);
             const cur = this._num(e?.charging_current, 0);
-            const mah = this._num(e?.capacity_done, 0);
-            const wh = this._num(e?.energy_done, 0);
             const fillEl = slotEl.querySelector(".pack-fill");
             if (fillEl) {
                 const fillW = status === "empty" ? 0 : Math.max(2, pct);
@@ -779,7 +781,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
                 vi[i].append(text);
             }
             const energyEl = slotEl.querySelector(".session-energy");
-            if (energyEl) energyEl.textContent = `${mah.toFixed(0)} mAh / ${wh.toFixed(2)} Wh`;
+            if (energyEl) energyEl.textContent = this._sessionText(e);
         }
     }
     _chargerUpdateDynamic() {
@@ -820,8 +822,6 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             const cur = this._num(e?.charging_current, 0);
             const vol = this._num(e?.output_voltage, 0);
             const btype = this._st(e?.battery_type, "\u2013");
-            const mah = this._num(e?.capacity_done, 0);
-            const wh = this._num(e?.energy_done, 0);
             // Update fill width and colors
             const fillEl = slotEl.querySelector(".battery-fill");
             if (fillEl) {
@@ -873,7 +873,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             }
             // Update session energy (time is handled by timer)
             const energyEl = slotEl.querySelector(".session-energy");
-            if (energyEl) energyEl.textContent = `${mah.toFixed(0)} mAh / ${wh.toFixed(2)} Wh`;
+            if (energyEl) energyEl.textContent = this._sessionText(e);
         }
     }
     _setField(root, name, html) {
@@ -1245,8 +1245,6 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         const cur = this._num(e?.charging_current, 0);
         const vol = this._num(e?.output_voltage, 0);
         const btype = this._st(e?.battery_type, "\u2013");
-        const mah = this._num(e?.capacity_done, 0);
-        const wh = this._num(e?.energy_done, 0);
         const since = this._st(e?.charge_time, null);
         let timeStr = "\u2013";
         if (since && ![
@@ -1316,7 +1314,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
           ${isActive ? `
             <div class="slot-session">
               <span class="time-val" data-entity="${e?.charge_time || ""}" ${isCharging ? `data-since="${since || ""}"` : ""}><ha-icon icon="mdi:timer-outline"></ha-icon>${timeStr}</span>
-              <span class="session-energy">${mah.toFixed(0)} mAh / ${wh.toFixed(2)} Wh</span>
+              <span class="session-energy">${this._sessionText(e)}</span>
             </div>` : ""}
         </div>
       </div>`;
