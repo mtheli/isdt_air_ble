@@ -83,6 +83,9 @@ _BACKOFF_MAX = 300
 # Warn once when the device has not advertised for this long, so the gap
 # shows up in the log at the default level.
 _SILENT_WARN_AFTER = 600  # seconds
+# Re-send the MASS2 clock this often on a long-running connection, and at
+# once when the UTC offset changes (daylight saving time).
+_RTC_RESYNC_INTERVAL = 24 * 3600  # seconds
 
 # Request/response pacing: how long to wait for the answer to a command
 # before moving on. Adapters answer with one larger frame per command.
@@ -267,6 +270,10 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         self._silent_since: float | None = None
         self._silent_warned = False
 
+        # Last MASS2 clock sync: monotonic time and the UTC offset sent
+        self._rtc_synced_at: float | None = None
+        self._rtc_offset = None
+
         # Charger values survive cycles in which their response is missing
         self._charger_hold = ChargerValueHold()
 
@@ -432,6 +439,8 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 if cmd_index == 0:
                     await self._collect_and_push(last_push_time)
                     last_push_time = asyncio.get_event_loop().time()
+                    if self._rtc_resync_due():
+                        await self._resync_mass2_clock()
 
             except asyncio.CancelledError:
                 _LOGGER.debug("Live monitoring cancelled")
@@ -1233,8 +1242,38 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 now.strftime("%Y-%m-%d %H:%M:%S"),
                 offset_hours,
             )
+            self._rtc_synced_at = time.monotonic()
+            self._rtc_offset = offset
         except Exception as err:
             _LOGGER.debug("Failed to set MASS2 RTC: %s", err)
+
+    def _rtc_resync_due(self) -> bool:
+        """Whether the MASS2 clock needs another sync on the running link.
+
+        The clock is set on connect. A connection can run for days, across
+        a daylight saving change, so re-send it when the UTC offset moved
+        and once a day against drift.
+        """
+        if self.adapter_protocol != AdapterProtocol.MASS2 or self._rtc_synced_at is None:
+            return False
+        from homeassistant.util import dt as dt_util
+
+        if dt_util.now().utcoffset() != self._rtc_offset:
+            return True
+        return time.monotonic() - self._rtc_synced_at >= _RTC_RESYNC_INTERVAL
+
+    async def _resync_mass2_clock(self) -> None:
+        """Send the clock between two cycles without disturbing the next one."""
+        await self._send_mass2_set_time()
+        # Whatever the device sends back must not count as the answer to
+        # the next command of the cycle.
+        await asyncio.sleep(0.3)
+        while not self._response_queue.empty():
+            try:
+                self._response_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+        self._response_event.clear()
 
     # ------------------------------------------------------------------
     # Hardware info (one-time query after connect)
