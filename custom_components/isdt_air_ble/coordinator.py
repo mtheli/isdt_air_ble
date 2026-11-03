@@ -80,6 +80,9 @@ _RAW_LOGGER.setLevel(logging.WARNING)  # silent unless explicitly enabled
 # Backoff limits for reconnection attempts
 _BACKOFF_MIN = 5
 _BACKOFF_MAX = 300
+# Warn once when the device has not advertised for this long, so the gap
+# shows up in the log at the default level.
+_SILENT_WARN_AFTER = 600  # seconds
 
 # Request/response pacing: how long to wait for the answer to a command
 # before moving on. Adapters answer with one larger frame per command.
@@ -260,6 +263,10 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         # Change detection: only push to HA when sensor data actually changed
         self._last_pushed_data: dict | None = None
 
+        # Since when the loop has been waiting for an advertisement
+        self._silent_since: float | None = None
+        self._silent_warned = False
+
         # Charger values survive cycles in which their response is missing
         self._charger_hold = ChargerValueHold()
 
@@ -372,6 +379,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                             self.address,
                             backoff,
                         )
+                        self._note_silence()
                         self._device_available.clear()
                         try:
                             await asyncio.wait_for(
@@ -382,6 +390,8 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                             pass
                         backoff = min(backoff * 2, _BACKOFF_MAX)
                         continue
+
+                    self._note_advertising()
 
                     # Connecting to device
                     async with self._connection_lock:
@@ -453,6 +463,33 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 except asyncio.TimeoutError:
                     pass
                 backoff = min(backoff * 2, _BACKOFF_MAX)
+
+    def _note_silence(self) -> None:
+        """Track how long the device has not advertised; warn once past the limit."""
+        now = time.monotonic()
+        if self._silent_since is None:
+            self._silent_since = now
+            return
+        silent = now - self._silent_since
+        if not self._silent_warned and silent >= _SILENT_WARN_AFTER:
+            self._silent_warned = True
+            _LOGGER.warning(
+                "%s has not advertised for %d minutes; it cannot reconnect "
+                "until it does",
+                self.address,
+                silent // 60,
+            )
+
+    def _note_advertising(self) -> None:
+        """End a silent period; report its length if it was long enough to warn."""
+        if self._silent_since is not None and self._silent_warned:
+            _LOGGER.warning(
+                "%s is advertising again after %d minutes",
+                self.address,
+                (time.monotonic() - self._silent_since) // 60,
+            )
+        self._silent_since = None
+        self._silent_warned = False
 
     async def _send_and_wait(self, cmd: bytearray, cycle_end: bool = False) -> None:
         """Send one command and wait for its response (or a timeout).
@@ -777,6 +814,10 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             await self._setup_notifications()
             await self._send_bind_request()
             self._connected = True
+            # Push the first cycle after every connect, even when the values
+            # equal the last push from before the drop: the entities went
+            # unavailable on disconnect and only a push brings them back.
+            self._last_pushed_data = None
             self._connect_time = time.monotonic()
             self._watchdog.reset(self._connect_time)
             _LOGGER.debug("Persistent connection established to %s", self.address)
