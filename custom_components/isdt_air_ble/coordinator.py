@@ -100,7 +100,12 @@ _ADAPTER_CYCLE_MIN = 0.5  # seconds, on top of command_interval
 _STALL_MAX_MISSES_CHARGER = 8
 _STALL_MAX_MISSES_ADAPTER = 3
 _STALL_MAX_SILENCE = 10.0  # seconds without any response
-_STALL_COOLDOWN = 10.0  # seconds to wait after dropping a stalled link
+# Seconds to wait after dropping a stalled link, by number of stalls in a
+# row. When the MASS2 stops answering, it accepts new connections at once
+# but leaves every GATT request unanswered for about two minutes. Retrying
+# every 20 s only piles up connects whose requests BlueZ has to abort, so
+# the wait grows until a full command cycle succeeds again.
+_STALL_COOLDOWNS = (10.0, 30.0, 60.0)
 # Upper bound for a single GATT operation (write, start/stop notify, MTU
 # exchange). Writes without response normally return within milliseconds;
 # when the controller stops taking ACL packets, BlueZ never answers the
@@ -356,6 +361,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         backoff = _BACKOFF_MIN
         cmd_index = 0
         last_push_time = 0.0
+        self._stall_streak = 0
 
         while True:
             try:
@@ -437,6 +443,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
 
                 # After cycle completion, collect responses and push data
                 if cmd_index == 0:
+                    self._stall_streak = 0
                     await self._collect_and_push(last_push_time)
                     last_push_time = asyncio.get_event_loop().time()
                     if self._rtc_resync_due():
@@ -446,15 +453,16 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("Live monitoring cancelled")
                 raise
             except ResponseStall as err:
+                cooldown = self._next_stall_cooldown()
                 _LOGGER.warning(
                     "%s stopped answering (%s) – dropping the connection, "
                     "reconnecting in %ds",
                     self.address,
                     err,
-                    _STALL_COOLDOWN,
+                    cooldown,
                 )
                 await self._disconnect()
-                await asyncio.sleep(_STALL_COOLDOWN)
+                await asyncio.sleep(cooldown)
             except Exception as err:
                 _LOGGER.warning(
                     "Live monitoring error: %s: %s – waiting %ds before reconnect",
@@ -472,6 +480,12 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 except asyncio.TimeoutError:
                     pass
                 backoff = min(backoff * 2, _BACKOFF_MAX)
+
+    def _next_stall_cooldown(self) -> float:
+        """Return the wait before reconnecting and count the stall."""
+        streak = getattr(self, "_stall_streak", 0)
+        self._stall_streak = streak + 1
+        return _STALL_COOLDOWNS[min(streak, len(_STALL_COOLDOWNS) - 1)]
 
     def _note_silence(self) -> None:
         """Track how long the device has not advertised; warn once past the limit."""
@@ -1038,11 +1052,13 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             except asyncio.QueueFull:
                 pass
 
+        subscribed = False
         try:
             await self._gatt(
                 self._client.start_notify(CHAR_UUID_AF02, af02_callback),
                 "start_notify AF02",
             )
+            subscribed = True
             await asyncio.sleep(0.3)
 
             cmd = (
@@ -1086,12 +1102,15 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.warning("Failed to send bind request: %s", err)
 
         finally:
-            try:
-                await self._gatt(
-                    self._client.stop_notify(CHAR_UUID_AF02), "stop_notify AF02"
-                )
-            except Exception:
-                pass
+            # Same BlueZ abort as in _disconnect() if the subscribe is pending.
+            if subscribed:
+                try:
+                    await self._gatt(
+                        self._client.stop_notify(CHAR_UUID_AF02),
+                        "stop_notify AF02",
+                    )
+                except Exception:
+                    pass
 
     @property
     def connected(self) -> bool:
@@ -1107,6 +1126,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         """
         client = self._client
         was_connected = self._connected
+        notifying = self._notification_started
         self._client = None
         self._connected = False
         self._notification_started = False
@@ -1122,10 +1142,17 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         is_connected = getattr(client, "is_connected", None)
         try:
             async with asyncio.timeout(5.0):
-                try:
-                    await client.stop_notify(CHAR_UUID_AF01)
-                except Exception as err:
-                    _LOGGER.debug("stop_notify failed during disconnect: %s", err)
+                # Only unsubscribe after a completed start_notify. While the
+                # subscribe write is still pending, stop_notify makes BlueZ
+                # 5.85 abort (gatt-client.c disable_ccc_callback assertion),
+                # which restarts bluetoothd and drops every other device.
+                if notifying:
+                    try:
+                        await client.stop_notify(CHAR_UUID_AF01)
+                    except Exception as err:
+                        _LOGGER.debug(
+                            "stop_notify failed during disconnect: %s", err
+                        )
                 await client.disconnect()
                 _LOGGER.debug(
                     "Disconnected from %s (was_connected=%s, bleak_is_connected=%s)",
@@ -1290,11 +1317,13 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             except asyncio.QueueFull:
                 pass
 
+        subscribed = False
         try:
             await self._gatt(
                 self._client.start_notify(CHAR_UUID_AF02, hw_notification_callback),
                 "start_notify AF02",
             )
+            subscribed = True
             await asyncio.sleep(0.3)
 
             _LOGGER.debug("Sending HardwareInfoReq on AF02: %s", CMD_HARDWARE_INFO_REQ.hex(" "))
@@ -1332,12 +1361,15 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.warning("Failed to fetch hardware info: %s", err)
 
         finally:
-            try:
-                await self._gatt(
-                    self._client.stop_notify(CHAR_UUID_AF02), "stop_notify AF02"
-                )
-            except Exception:
-                pass
+            # Same BlueZ abort as in _disconnect() if the subscribe is pending.
+            if subscribed:
+                try:
+                    await self._gatt(
+                        self._client.stop_notify(CHAR_UUID_AF02),
+                        "stop_notify AF02",
+                    )
+                except Exception:
+                    pass
 
     # ------------------------------------------------------------------
     # RSSI / device registry
