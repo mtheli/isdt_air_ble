@@ -41,6 +41,7 @@ def _coordinator(model: str, connected: bool) -> SimpleNamespace:
         address=ADDRESS,
         model=model,
         connected=connected,
+        entities_available=connected,
         last_update_success=True,
         data={0: {"status": 1}, 1: {"status": 1}},
         alarm_tone_on=True,

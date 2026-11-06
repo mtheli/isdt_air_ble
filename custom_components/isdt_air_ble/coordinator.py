@@ -19,6 +19,7 @@ from bleak_retry_connector import establish_connection
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import BluetoothCallbackMatcher
 from homeassistant.core import callback
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -101,11 +102,16 @@ _STALL_MAX_MISSES_CHARGER = 8
 _STALL_MAX_MISSES_ADAPTER = 3
 _STALL_MAX_SILENCE = 10.0  # seconds without any response
 # Seconds to wait after dropping a stalled link, by number of stalls in a
-# row. When the MASS2 stops answering, it accepts new connections at once
-# but leaves every GATT request unanswered for about two minutes. Retrying
-# every 20 s only piles up connects whose requests BlueZ has to abort, so
-# the wait grows until a full command cycle succeeds again.
-_STALL_COOLDOWNS = (10.0, 30.0, 60.0)
+# row. A short drop is over by the first retry. A real MASS2 stall leaves
+# new connections unanswered until the firmware's 120 s housekeeping run,
+# once or twice in a row (btmon 06.11.2026: 2 and 4 minutes), so the later
+# retries wait just past one such period instead of reconnecting every
+# minute. The streak resets after a full command cycle.
+_STALL_COOLDOWNS = (10.0, 130.0)
+# Entities keep their last values this long after a stall before they go
+# unavailable, so a stall that ends on its own does not show as an outage.
+# The connectivity sensor still reports the dropped link at once.
+_STALL_GRACE = 300.0  # seconds
 # Upper bound for a single GATT operation (write, start/stop notify, MTU
 # exchange). Writes without response normally return within milliseconds;
 # when the controller stops taking ACL packets, BlueZ never answers the
@@ -218,6 +224,9 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         self._client: BleakClient | None = None
         self._connected = False
         self._connect_time: float | None = None
+        # Start of the current stall, while its grace period runs
+        self._stall_since: float | None = None
+        self._grace_unsub: Callable | None = None
         self._response_queue: asyncio.Queue = asyncio.Queue(maxsize=200)
         self._notification_started = False
 
@@ -293,6 +302,43 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         return self._mass2_settings
 
     @property
+    def entities_available(self) -> bool:
+        """Return True while entities should show values.
+
+        True while connected, and for ``_STALL_GRACE`` seconds after a stall
+        dropped the link.
+        """
+        if self._connected:
+            return True
+        since = getattr(self, "_stall_since", None)
+        return since is not None and time.monotonic() - since < _STALL_GRACE
+
+    def _begin_stall_grace(self) -> None:
+        """Start the grace period, unless one is already running."""
+        if getattr(self, "_stall_since", None) is not None:
+            return
+        self._stall_since = time.monotonic()
+        self._grace_unsub = async_call_later(
+            self.hass, _STALL_GRACE, self._async_end_stall_grace
+        )
+
+    @callback
+    def _async_end_stall_grace(self, _now) -> None:
+        """Grace period over without a connection: entities go unavailable."""
+        self._grace_unsub = None
+        self._stall_since = None
+        if not self._connected:
+            self.async_update_listeners()
+
+    def _clear_stall_grace(self) -> None:
+        """Stop a running grace period."""
+        unsub = getattr(self, "_grace_unsub", None)
+        if unsub is not None:
+            unsub()
+        self._grace_unsub = None
+        self._stall_since = None
+
+    @property
     def ps200_dc(self) -> dict | None:
         """Return cached PS200 DC connector status (Power 200 family)."""
         return self._ps200_dc
@@ -338,6 +384,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 await asyncio.wait_for(asyncio.shield(self._live_task), timeout=5.0)
             except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
+        self._clear_stall_grace()
         await self._disconnect()
 
     # ------------------------------------------------------------------
@@ -461,6 +508,8 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                     err,
                     cooldown,
                 )
+                # Before _disconnect(), which notifies the entities
+                self._begin_stall_grace()
                 await self._disconnect()
                 await asyncio.sleep(cooldown)
             except Exception as err:
@@ -837,6 +886,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             await self._setup_notifications()
             await self._send_bind_request()
             self._connected = True
+            self._clear_stall_grace()
             # Push the first cycle after every connect, even when the values
             # equal the last push from before the drop: the entities went
             # unavailable on disconnect and only a push brings them back.

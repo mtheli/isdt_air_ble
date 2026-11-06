@@ -55,7 +55,7 @@ class ISDTC4SlotActiveSensor(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.connected
+        return self.coordinator.entities_available
 
     @property
     def is_on(self):
@@ -123,7 +123,7 @@ class ISDTC4BatteryInsertedSensor(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.connected
+        return self.coordinator.entities_available
 
     @property
     def is_on(self):
@@ -162,7 +162,7 @@ class ISDTC4SlotErrorSensor(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.connected
+        return self.coordinator.entities_available
 
     @property
     def is_on(self):
@@ -219,7 +219,7 @@ class ISDTMASS2PortActiveSensor(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.connected
+        return self.coordinator.entities_available
 
     @property
     def is_on(self):

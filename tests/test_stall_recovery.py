@@ -93,8 +93,56 @@ def test_stalled_af02_subscribe_is_not_unsubscribed(monkeypatch, method):
 def test_stall_cooldown_grows_and_caps():
     c = _make_coordinator()
     c._stall_streak = 0
-    waits = [c._next_stall_cooldown() for _ in range(5)]
-    assert waits == [10.0, 30.0, 60.0, 60.0, 60.0]
+    waits = [c._next_stall_cooldown() for _ in range(4)]
+    assert waits == [10.0, 130.0, 130.0, 130.0]
     # A completed command cycle resets the streak in the live loop.
     c._stall_streak = 0
     assert c._next_stall_cooldown() == 10.0
+
+
+def _grace_coordinator(monkeypatch, now):
+    c = _make_coordinator()
+    c.hass = object()
+    c._stall_since = None
+    c._grace_unsub = None
+    scheduled = []
+
+    def fake_call_later(hass, delay, action):
+        scheduled.append((delay, action))
+        return lambda: scheduled.append(("cancelled", None))
+
+    monkeypatch.setattr(coord, "async_call_later", fake_call_later)
+    monkeypatch.setattr(coord.time, "monotonic", lambda: now[0])
+    updates = []
+    c.async_update_listeners = lambda: updates.append(now[0])
+    return c, scheduled, updates
+
+
+def test_entities_stay_available_during_stall_grace(monkeypatch):
+    now = [1000.0]
+    c, scheduled, updates = _grace_coordinator(monkeypatch, now)
+    assert c.entities_available is False
+
+    c._begin_stall_grace()
+    c._begin_stall_grace()  # a second stall does not restart the period
+    assert len(scheduled) == 1 and scheduled[0][0] == coord._STALL_GRACE
+    now[0] += coord._STALL_GRACE - 1
+    assert c.entities_available is True
+
+    now[0] += 1
+    assert c.entities_available is False
+    scheduled[0][1](None)
+    assert updates == [now[0]]
+    assert c._stall_since is None
+
+
+def test_reconnect_ends_stall_grace(monkeypatch):
+    now = [1000.0]
+    c, scheduled, updates = _grace_coordinator(monkeypatch, now)
+    c._begin_stall_grace()
+    c._connected = True
+    c._clear_stall_grace()
+    assert ("cancelled", None) in scheduled
+    assert c.entities_available is True
+    c._connected = False
+    assert c.entities_available is False
