@@ -320,3 +320,29 @@ def test_k2air_uses_balance_charger_enums():
         )
         assert parsed[ch]["work_state_str"] == "charging"
         assert parsed[ch]["unit_serials_num"] == 4
+
+
+def test_k4_uses_balance_charger_enums():
+    """The K4 is a dual-channel LiPo balance charger like the K2 Air
+    (issue #11): two channels, LiPo enums, not the round-cell C4 maps."""
+    from isdt_air_ble.const import get_channel_count
+
+    assert get_channel_count("K4") == 2
+
+    frames = []
+    for ch in range(2):
+        frame = bytearray(38)
+        frame[0] = 0x31
+        frame[1] = 0xE7
+        frame[2] = ch
+        frame[3] = 0x03   # charging (CC)
+        frame[17] = 0x01  # LiPo
+        frame[18] = 8     # 8S detected on each channel
+        frames.append(bytes(frame))
+
+    parsed, _ = parse_charger_responses(frames, num_channels=2, model="K4")
+
+    for ch in range(2):
+        assert parsed[ch]["battery_type_str"] == "LiPo"
+        assert parsed[ch]["work_state_str"] == "charging"
+        assert parsed[ch]["unit_serials_num"] == 8

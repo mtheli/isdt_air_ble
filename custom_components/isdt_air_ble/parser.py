@@ -377,7 +377,7 @@ def parse_workstate(data: bytes, model: str = "C4 Air") -> dict:
     A8 Air mega-packet data is pre-converted to this format by
     _parse_a8_air_workstate_mega() before reaching this function.
 
-    LiPo balance chargers (Air 8, K2 Air) use different work-state and
+    LiPo balance chargers (Air 8, K2 Air, K4) use different work-state and
     battery-type enums than the round-cell chargers — pass the matching
     model name to apply the balance-charger maps.
     """

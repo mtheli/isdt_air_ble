@@ -29,7 +29,7 @@ function $d8078e452c66bdbe$export$625550452a3fa3ec(hass, key) {
 
 
 // Written by the release sync script (isdt_air_ble scripts/sync_card.sh).
-const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.12.1";
+const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.13.3";
 const $8ee5ce714273e53b$export$9b657414b7dffe40 = "bundled";
 
 
@@ -46,7 +46,8 @@ const $9a3262f48b2f355e$var$MASS2_USBA_MAX = 12;
 // custom_components/isdt_air_ble/const.py.
 const $9a3262f48b2f355e$var$BALANCE_CHARGER_MODELS = new Set([
     "Air 8",
-    "K2 Air"
+    "K2 Air",
+    "K4"
 ]);
 // Maximum number of cells the protocol can report per channel
 // (ElectricResp short variant carries 8 cellVoltageList slots).
@@ -471,7 +472,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         return this._chargerHTML();
     }
     /* ────────────────────────────────────────────────────────────────
-     Balance-charger layout (Air 8, K2 Air)
+     Balance-charger layout (Air 8, K2 Air, K4)
      One full-width pack tile per channel with per-cell V + IR chips.
      ──────────────────────────────────────────────────────────────── */ _cellGridDimensions(cellCount) {
         if (cellCount <= 1) return {
@@ -654,7 +655,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             ];
         }
         // Every other charger: show exactly the slots the integration created.
-        // Air 8 → 1, K2 Air → 2, A4 Air → 4, A8 Air → 8, …
+        // Air 8 → 1, K2 Air/K4 → 2, A4 Air → 4, A8 Air → 8, …
         return allSlots;
     }
     _chargerHTML() {
@@ -1898,7 +1899,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
     }
     .port.off .port-bar-fill { background: var(--disabled-text-color); }
 
-    /* \u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550} Balance-charger (Air 8, K2 Air) \u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550} */
+    /* \u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550} Balance-charger (Air 8, K2 Air, K4) \u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550} */
     .pack-wrap {
       padding: 12px 12px 16px;
       display: flex; flex-direction: column; gap: 18px;

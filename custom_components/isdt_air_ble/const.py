@@ -156,7 +156,7 @@ AIR8_WORK_STATE_MAP = {
     18: "charging",
 }
 
-# Battery chemistry mapping for LiPo balance chargers (Air 8, K2 Air).
+# Battery chemistry mapping for LiPo balance chargers (Air 8, K2 Air, K4).
 # The enum is different from the round-cell chargers — index 1 is LiPo
 # (not LiIon) and the higher indices are LiPo-specific chemistries.
 AIR8_BATTERY_TYPE_MAP = {
@@ -177,7 +177,8 @@ AIR8_BATTERY_TYPE_MAP = {
 # Members:
 #   - "Air 8" (single channel, 1S-8S)
 #   - "K2 Air" (two independent channels, 1S-6S each, parallel mode 1S-12S)
-BALANCE_CHARGER_MODELS = frozenset({"Air 8", "K2 Air"})
+#   - "K4" (two independent channels, 1S-8S each, parallel mode)
+BALANCE_CHARGER_MODELS = frozenset({"Air 8", "K2 Air", "K4"})
 
 # Camera battery chargers (NP2 Air for Sony, LP2 Air for Canon). Same wire
 # protocol as the round-cell chargers, but a different work-state enum:
@@ -267,7 +268,8 @@ MODEL_ADAPTER_PROTOCOL_MAP: dict[str, AdapterProtocol] = {
 MODEL_CHANNEL_COUNT_MAP: dict[str, int] = {
     "A8 Air": 8,  # Channels 0-7
     "A4 Air": 4,
-    "K2 Air": 2,  # Two-slot round-cell charger
+    "K2 Air": 2,  # Two balance channels
+    "K4": 2,      # Two balance channels
     "Air 8": 1,   # Single LiPo pack port (up to 6 cells on one channel)
     "NP2 Air": 2,
     "LP2 Air": 2,

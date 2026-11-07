@@ -56,7 +56,7 @@ device_id: <your-device-id>
 | **LiPo balance chargers** | | |
 | [Air 8](https://www.isdt.co/air8.html?lang=en) (1S–8S, single channel) | :white_check_mark: | Community ([#2](https://github.com/mtheli/isdt_air_ble/issues/2)) |
 | [K2 Air](https://www.isdt.co/k2air.html?lang=en) (2 × 1S–6S) | :white_check_mark: | Community ([#3](https://github.com/mtheli/isdt_air_ble/issues/3)) |
-| [K4](https://www.isdt.co/k4.html?lang=en) | *not yet tested* | In progress ([#11](https://github.com/mtheli/isdt_air_ble/issues/11)) |
+| [K4](https://www.isdt.co/k4.html?lang=en) (2 × 1S–8S) | *not yet tested* | In progress ([#11](https://github.com/mtheli/isdt_air_ble/issues/11)) |
 | [608PD](https://www.isdt.co/608pd.html?lang=en) | *not yet tested* | — |
 | **USB power adapters** | | |
 | [MASS2](https://www.isdt.co/mass2.html?lang=en) (8 USB ports) | :white_check_mark: | Maintainer |
