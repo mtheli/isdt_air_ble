@@ -101,6 +101,16 @@ def hexs(data: bytes) -> str:
     return data.hex(" ")
 
 
+def text_field(data: bytes) -> str:
+    """ASCII up to the first NUL/0xFF; empty fields are filled with 0xFF."""
+    out = bytearray()
+    for b in data:
+        if b in (0x00, 0xFF):
+            break
+        out.append(b)
+    return out.decode("ascii", errors="replace").strip()
+
+
 def u16(data: bytes, offset: int):
     if len(data) < offset + 2:
         return None
@@ -156,11 +166,13 @@ def decode_advert(payload: bytes) -> dict:
     out["cycles"] = u16(payload, 8)
     if len(payload) >= 11:
         out["cells"] = payload[10]
-    out["field_11_12"] = u16(payload, 11)
+    capacity = u16(payload, 11)
+    if capacity is not None:
+        out["capacity_mah"] = capacity * 10
     if len(payload) >= 14:
-        out["byte_13"] = payload[13]
-    if len(payload) > 14:
-        out["tail_ascii"] = payload[14:].decode("ascii", errors="replace").rstrip("\x00 ")
+        out["flags"] = f"0x{payload[13]:02x}"
+    if len(payload) >= 18:
+        out["filter"] = text_field(payload[14:18])
     return {k: v for k, v in out.items() if v is not None}
 
 
@@ -219,23 +231,66 @@ async def run_scan(args, cap: Capture) -> None:
 # --------------------------------------------------------------------------
 
 def decode_response(data: bytes) -> dict:
-    """Decode the parts of a response that are understood so far."""
+    """Decode a response. Checked against a 4S pack, see tests/test_battair_probe.py."""
     cmd = data[0]
     out = {}
-    if cmd == 0x11 and len(data) > 4:
-        cells = [u16(data, i) for i in range(4, len(data) - 1, 2)]
-        out["cell_group"] = 0 if data[3] == 0x80 else data[3]
-        out["cells_mv"] = [c for c in cells if c]
+    if cmd == 0x03 and len(data) >= 18:
+        out["hardware"] = f"{data[3]}.{data[4]}"
+        out["software"] = f"{data[5]}.{data[6]}"
+        out["battery_type"] = BATTERY_TYPES.get(data[9], f"unknown({data[9]})")
+        out["cells"] = data[10]
+        out["feature_bits"] = f"0x{data[11]:02x}"
+        out["oem_customer"] = u16(data, 12)
+        date = u32(data, 14)
+        out["production_date"] = (f"{((date >> 26) & 63) + 2017}-"
+                                  f"{(date >> 22) & 15:02d}-{(date >> 17) & 31:02d}")
+    elif cmd == 0x11 and len(data) > 4:
+        group = 0 if data[3] == 0x80 else data[3]
+        count = group * 8 + 8
+        out["cell_group"] = group
+        # Fixed-size slots; only the first <cells> carry a value, trailing
+        # slots are zero or padding. Cut at the first empty slot.
+        cells = [u16(data, 4 + 2 * i) for i in range(count)]
+        out["cells_mv"] = [c for c in cells if c is not None]
+        if 0 in out["cells_mv"]:
+            out["cells_mv"] = out["cells_mv"][:out["cells_mv"].index(0)]
     elif cmd == 0x13:
         out["temperature_c"] = s8(data, 3)
         out["discharge_current_raw"] = u32(data, 4)
         out["charge_current_raw"] = u32(data, 8)
         if len(data) > 12:
             out["level"] = data[12]
-    elif cmd == 0x05:
+    elif cmd == 0x05 and len(data) >= 14:
         out["cycles"] = u16(data, 3)
-    elif cmd in (0x0B, 0x17):
-        out["text"] = data[3:].decode("ascii", errors="replace").rstrip("\x00 ")
+        out["error_log"] = u16(data, 5)
+        out["outages"] = data[7]
+        out["over_temperature"] = u16(data, 8)
+        out["over_voltage"] = u16(data, 10)
+        out["over_discharge"] = u16(data, 12)
+    elif cmd == 0x0F and len(data) >= 12:
+        out["charge_current_ma"] = data[3] | data[4] << 8 | data[5] << 16
+        out["storage_mv"] = u16(data, 6)
+        out["full_charge_mv"] = u16(data, 8)
+        out["auto_storage_timer"] = "disabled" if data[10] == 0xFF else data[10]
+        out["led"] = data[11]
+    elif cmd == 0x15 and len(data) >= 20:
+        out["over_discharge_mv"] = u16(data, 3)
+        out["discharge_mv"] = u16(data, 5)
+        out["full_charge_mv"] = u16(data, 7)
+        out["storage_mv"] = u16(data, 9)
+        out["charge_rate_c"] = u16(data, 11) / 10
+        out["discharge_rate_c"] = u16(data, 13) / 10
+        out["use_temp_c"] = [s8(data, 15), data[16]]
+        out["storage_temp_c"] = [s8(data, 17), data[18]]
+        out["self_discharge"] = data[19]
+    elif cmd == 0x29 and len(data) >= 7:
+        hours = u32(data, 3)
+        out["activation_hours"] = hours
+        out["activation_days"] = hours // 24
+    elif cmd in (0x0B, 0x17) and len(data) > 4:
+        out["text"] = text_field(data[4:4 + data[3]])
+    elif cmd == 0x1F and len(data) >= 7:
+        out["filter"] = text_field(data[3:7])
     return {k: v for k, v in out.items() if v is not None}
 
 

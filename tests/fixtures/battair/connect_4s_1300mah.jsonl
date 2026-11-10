@@ -1,0 +1,42 @@
+{"t": "2026-11-09T20:54:08.809", "kind": "meta", "mode": "connect", "label": "6s_pack", "platform": "linux"}
+{"t": "2026-11-09T20:54:08.814", "kind": "meta_connect", "address": "54:14:A7:EF:88:AD", "real_mac": "54:14:A7:EF:88:AD", "key": "0xad"}
+{"t": "2026-11-09T20:54:36.508", "kind": "connect", "mtu": 23}
+{"t": "2026-11-09T20:54:36.853", "kind": "write", "char": "BA01", "purpose": "Handshake", "plain": "00 00 00 ad 88 ef a7 14 54 01 00", "wire": "ad ad ad 00 25 42 0a b9 f9 ac ad"}
+{"t": "2026-11-09T20:54:36.942", "kind": "notify", "char": "BA01", "wire": "ac ad ad ad", "plain": "01 00 00 00"}
+{"t": "2026-11-09T20:54:37.857", "kind": "round", "n": 1}
+{"t": "2026-11-09T20:54:37.857", "kind": "write", "char": "BA01", "purpose": "HardwareInfo", "plain": "02 00 00", "wire": "af ad ad"}
+{"t": "2026-11-09T20:54:37.932", "kind": "notify", "char": "BA01", "wire": "ae ad ad af ad ac 8f ad af ac a9 ad ac ad 19 a6 c3 b0", "plain": "03 00 00 02 00 01 22 00 02 01 04 00 01 00 b4 0b 6e 1d"}
+{"t": "2026-11-09T20:54:37.933", "kind": "response", "purpose": "HardwareInfo", "plain": "03 00 00 02 00 01 22 00 02 01 04 00 01 00 b4 0b 6e 1d", "decoded": {}}
+{"t": "2026-11-09T20:54:37.933", "kind": "write", "char": "BA01", "purpose": "BleName", "plain": "0a 00 00", "wire": "a7 ad ad"}
+{"t": "2026-11-09T20:54:38.022", "kind": "notify", "char": "BA01", "wire": "a6 ad ad b9 ef cc d9 d9 ec c4 df ad 8d 8d 8d 8d 8d 8d 8d 8d ad ad ad ad", "plain": "0b 00 00 14 42 61 74 74 41 69 72 00 20 20 20 20 20 20 20 20 00 00 00 00"}
+{"t": "2026-11-09T20:54:38.022", "kind": "response", "purpose": "BleName", "plain": "0b 00 00 14 42 61 74 74 41 69 72 00 20 20 20 20 20 20 20 20 00 00 00 00", "decoded": {"text": "\u0014BattAir"}}
+{"t": "2026-11-09T20:54:38.023", "kind": "write", "char": "BA01", "purpose": "OEMName", "plain": "16 00 00", "wire": "bb ad ad"}
+{"t": "2026-11-09T20:54:38.112", "kind": "notify", "char": "BA01", "wire": "ba ad ad bd ef cc d9 d9 ec c4 df ad ad ad ad ad ad ad ad ad", "plain": "17 00 00 10 42 61 74 74 41 69 72 00 00 00 00 00 00 00 00 00"}
+{"t": "2026-11-09T20:54:38.112", "kind": "response", "purpose": "OEMName", "plain": "17 00 00 10 42 61 74 74 41 69 72 00 00 00 00 00 00 00 00 00", "decoded": {"text": "\u0010BattAir"}}
+{"t": "2026-11-09T20:54:38.112", "kind": "write", "char": "BA01", "purpose": "CellVoltages", "plain": "10 00 00 00", "wire": "bd ad ad ad"}
+{"t": "2026-11-09T20:54:38.202", "kind": "notify", "char": "BA01", "wire": "bc ad ad 2d 4a a3 71 a3 45 a3 72 a3 ad ad ad ad ad ad ad ba", "plain": "11 00 00 80 e7 0e dc 0e e8 0e df 0e 00 00 00 00 00 00 00 17"}
+{"t": "2026-11-09T20:54:38.203", "kind": "response", "purpose": "CellVoltages", "plain": "11 00 00 80 e7 0e dc 0e e8 0e df 0e 00 00 00 00 00 00 00 17", "decoded": {"cell_group": 0, "cells_mv": [3815, 3804, 3816, 3807, 5888]}}
+{"t": "2026-11-09T20:54:38.203", "kind": "write", "char": "BA01", "purpose": "RealTime", "plain": "12 00 00", "wire": "bf ad ad"}
+{"t": "2026-11-09T20:54:38.337", "kind": "notify", "char": "BA01", "wire": "be ad ad ba ad ad ad ad ad ad ad ad 8f", "plain": "13 00 00 17 00 00 00 00 00 00 00 00 22"}
+{"t": "2026-11-09T20:54:38.338", "kind": "response", "purpose": "RealTime", "plain": "13 00 00 17 00 00 00 00 00 00 00 00 22", "decoded": {"temperature_c": 23, "discharge_current_raw": 0, "charge_current_raw": 0, "level": 34}}
+{"t": "2026-11-09T20:54:38.338", "kind": "write", "char": "BA01", "purpose": "AbnormalStatistics", "plain": "04 00 00", "wire": "a9 ad ad"}
+{"t": "2026-11-09T20:54:38.427", "kind": "notify", "char": "BA01", "wire": "a8 ad ad ac ad ad ad ad ad ad ad ad ad ad", "plain": "05 00 00 01 00 00 00 00 00 00 00 00 00 00"}
+{"t": "2026-11-09T20:54:38.428", "kind": "response", "purpose": "AbnormalStatistics", "plain": "05 00 00 01 00 00 00 00 00 00 00 00 00 00", "decoded": {"cycles": 1}}
+{"t": "2026-11-09T20:54:38.428", "kind": "write", "char": "BA01", "purpose": "UserParameter", "plain": "0e 00 00", "wire": "a3 ad ad"}
+{"t": "2026-11-09T20:54:38.517", "kind": "notify", "char": "BA01", "wire": "a2 ad ad b9 a8 ad 91 a2 c5 bd 52 ac", "plain": "0f 00 00 14 05 00 3c 0f 68 10 ff 01"}
+{"t": "2026-11-09T20:54:38.518", "kind": "response", "purpose": "UserParameter", "plain": "0f 00 00 14 05 00 3c 0f 68 10 ff 01", "decoded": {}}
+{"t": "2026-11-09T20:54:38.518", "kind": "write", "char": "BA01", "purpose": "OEMParameter", "plain": "14 00 00", "wire": "b9 ad ad"}
+{"t": "2026-11-09T20:54:38.607", "kind": "notify", "char": "BA01", "wire": "b8 ad ad 15 a6 49 a1 c5 bd 91 a2 9f ad 8d ae 41 91 41 85 ac", "plain": "15 00 00 b8 0b e4 0c 68 10 3c 0f 32 00 20 03 ec 3c ec 28 01"}
+{"t": "2026-11-09T20:54:38.608", "kind": "response", "purpose": "OEMParameter", "plain": "15 00 00 b8 0b e4 0c 68 10 3c 0f 32 00 20 03 ec 3c ec 28 01", "decoded": {}}
+{"t": "2026-11-09T20:54:38.608", "kind": "write", "char": "BA01", "purpose": "GSensor", "plain": "1a 00 00", "wire": "b7 ad ad"}
+{"t": "2026-11-09T20:54:38.698", "kind": "notify", "char": "BA01", "wire": "b6 ad ad ad", "plain": "1b 00 00 00"}
+{"t": "2026-11-09T20:54:38.698", "kind": "response", "purpose": "GSensor", "plain": "1b 00 00 00", "decoded": {}}
+{"t": "2026-11-09T20:54:38.698", "kind": "write", "char": "BA01", "purpose": "Filter", "plain": "1e 00 00", "wire": "b3 ad ad"}
+{"t": "2026-11-09T20:54:38.787", "kind": "notify", "char": "BA01", "wire": "b2 ad ad 52 52 52 52", "plain": "1f 00 00 ff ff ff ff"}
+{"t": "2026-11-09T20:54:38.788", "kind": "response", "purpose": "Filter", "plain": "1f 00 00 ff ff ff ff", "decoded": {}}
+{"t": "2026-11-09T20:54:38.788", "kind": "write", "char": "BA01", "purpose": "Transportation", "plain": "26 00 00", "wire": "8b ad ad"}
+{"t": "2026-11-09T20:54:38.877", "kind": "notify", "char": "BA01", "wire": "8a ad ad ad", "plain": "27 00 00 00"}
+{"t": "2026-11-09T20:54:38.878", "kind": "response", "purpose": "Transportation", "plain": "27 00 00 00", "decoded": {}}
+{"t": "2026-11-09T20:54:38.878", "kind": "write", "char": "BA01", "purpose": "ActivationDays", "plain": "28 00 00", "wire": "85 ad ad"}
+{"t": "2026-11-09T20:54:38.967", "kind": "notify", "char": "BA01", "wire": "84 ad ad 74 a2 ad ad", "plain": "29 00 00 d9 0f 00 00"}
+{"t": "2026-11-09T20:54:38.968", "kind": "response", "purpose": "ActivationDays", "plain": "29 00 00 d9 0f 00 00", "decoded": {}}
