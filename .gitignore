@@ -25,6 +25,7 @@ philips_shaver/
 # Probe-script default output (move to tests/fixtures/ to keep)
 isdt_probe_*.jsonl
 air8_probe_*.jsonl
+battair_probe_*.jsonl
 
 # OS
 .DS_Store
