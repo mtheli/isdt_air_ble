@@ -10,6 +10,10 @@
         "title": "Confirm detected device",
         "description": "Do you want to add **{name}** to Home Assistant?\n\nClick Submit to start pairing."
       },
+      "battair_confirm": {
+        "title": "Add BattAir",
+        "description": "Do you want to add **{name}** ({address}) to Home Assistant?\n\nThe pack is read from its Bluetooth broadcasts only, no pairing or connection is needed."
+      },
       "pair": {
         "title": "Pair with {model}",
         "description": "Click Submit to start pairing.\n\nIf your device beeps and asks for confirmation (like the MASS2), **press any button on it within 30 seconds**. Devices without buttons (like the C4 Air or Power 200) accept the pairing automatically — no action needed."
@@ -49,6 +53,27 @@
   },
   "entity": {
     "sensor": {
+      "battair_voltage": { "name": "Voltage" },
+      "battair_cell_voltage_avg": { "name": "Average cell voltage" },
+      "battair_battery": { "name": "Charge level" },
+      "battair_temperature": { "name": "Temperature" },
+      "battair_cycles": { "name": "Cycles" },
+      "battair_cells": { "name": "Cells" },
+      "battair_capacity": { "name": "Capacity" },
+      "battair_battery_type": {
+        "name": "Battery type",
+        "state": {
+          "lihv": "LiHV",
+          "lipo": "LiPo",
+          "liion": "Li-ion",
+          "life": "LiFe",
+          "pb": "Lead-acid",
+          "nimh": "NiMH/NiCd",
+          "liuhv": "LiUHV"
+        }
+      },
+      "battair_rssi": { "name": "Signal strength" },
+      "battair_last_seen": { "name": "Last seen" },
       "input_voltage": {
         "name": "Input Voltage"
       },
@@ -161,6 +186,10 @@
       }
     },
     "binary_sensor": {
+      "battair_cell_voltage_low": { "name": "Low average cell voltage" },
+      "battair_error_log": { "name": "Error log" },
+      "battair_storage_discharge": { "name": "Storage discharge" },
+      "battair_transport_mode": { "name": "Transport mode" },
       "connected": {
         "name": "Connected"
       },

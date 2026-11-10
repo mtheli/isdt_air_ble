@@ -32,6 +32,16 @@ class ChargeSessionAction(StrEnum):
     ANCHOR = "anchor"  # (re)compute the start time from the device counter
     KEEP = "keep"      # keep the timestamp already latched for this session
 
+# Config entry kind. Entries without this key are chargers or adapters.
+CONF_DEVICE_KIND = "device_kind"
+DEVICE_KIND_BATTAIR = "battair"
+
+
+def is_battair_entry(entry) -> bool:
+    """Return True for a BattAir pack or plugin entry."""
+    return entry.data.get(CONF_DEVICE_KIND) == DEVICE_KIND_BATTAIR
+
+
 # Options
 # Pause between two commands of the poll cycle, 100 ms by default. Some
 # chargers skip commands that arrive too close together on a weaker link,

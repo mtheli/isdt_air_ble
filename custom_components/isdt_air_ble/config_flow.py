@@ -48,6 +48,8 @@ from .const import (
     detect_model_from_mfg_data,
     get_device_type,
 )
+from .battair import BATTAIR_MANUFACTURER_ID, decode_advert, default_title, is_battair
+from .const import CONF_DEVICE_KIND, DEVICE_KIND_BATTAIR, is_battair_entry
 from .parser import parse_hardware_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -145,6 +147,11 @@ class ISDTConfigFlow(ConfigFlow, domain=DOMAIN):
         """Return the options flow handler."""
         return ISDTOptionsFlow()
 
+    @classmethod
+    def async_supports_options_flow(cls, config_entry: ConfigEntry) -> bool:
+        """BattAir entries have no connection, so no connection options."""
+        return not is_battair_entry(config_entry)
+
     def __init__(self):
         super().__init__()
         self._discovery_info: BluetoothServiceInfoBleak | None = None
@@ -154,6 +161,7 @@ class ISDTConfigFlow(ConfigFlow, domain=DOMAIN):
         self._fetched_serial_number: str | None = None
         self._fetched_characteristics: dict[str, bool] = {}
         self._bind_uuid: bytes = uuid.uuid4().bytes
+        self._battair_title: str | None = None
 
     async def _async_pair_and_fetch_device_info(self, address: str) -> None:
         """Pair with the device and read hardware info.
@@ -274,6 +282,14 @@ class ISDTConfigFlow(ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured()
 
         self._discovery_info = discovery_info
+
+        if is_battair(
+            discovery_info.service_uuids,
+            discovery_info.name,
+            discovery_info.manufacturer_data,
+        ):
+            return await self.async_step_battair_confirm()
+
         self._device_model = _detect_model(discovery_info)
 
         self.context["title_placeholders"] = {"name": f"ISDT {self._device_model}"}
@@ -294,6 +310,36 @@ class ISDTConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="bluetooth_confirm",
             description_placeholders={"name": f"ISDT {self._device_model} ({name})"},
+        )
+
+    async def async_step_battair_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Confirm a BattAir pack or plugin. It is read from advertisements only."""
+        assert self._discovery_info is not None
+        info = self._discovery_info
+        advert = decode_advert(info.manufacturer_data.get(BATTAIR_MANUFACTURER_ID))
+        if self._battair_title is None:
+            self._battair_title = default_title(advert, info.address, info.name)
+        self.context["title_placeholders"] = {"name": self._battair_title}
+
+        if user_input is not None:
+            model = advert.model if advert is not None else "BattAir"
+            return self.async_create_entry(
+                title=self._battair_title,
+                data={
+                    "address": info.address,
+                    "model": model,
+                    CONF_DEVICE_KIND: DEVICE_KIND_BATTAIR,
+                },
+            )
+
+        return self.async_show_form(
+            step_id="battair_confirm",
+            description_placeholders={
+                "name": self._battair_title,
+                "address": info.address,
+            },
         )
 
     async def async_step_pair(

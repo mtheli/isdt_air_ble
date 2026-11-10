@@ -8,7 +8,8 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, DeviceType, get_port_count
+from .battair_entities import async_setup_binary_sensors as async_setup_battair
+from .const import DOMAIN, DeviceType, get_port_count, is_battair_entry
 from .helpers import main_device_info, slot_device_info, port_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,6 +17,10 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up ISDT binary sensors from a config entry."""
+    if is_battair_entry(entry):
+        await async_setup_battair(hass, entry, async_add_entities)
+        return
+
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
     entities = [

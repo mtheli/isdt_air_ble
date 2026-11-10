@@ -18,8 +18,10 @@ from homeassistant.const import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .battair_entities import async_setup_sensors as async_setup_battair
 from .const import (
     DOMAIN,
+    is_battair_entry,
     AdapterProtocol,
     ChargeSessionAction,
     DeviceType,
@@ -42,6 +44,10 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up ISDT sensor entities from a config entry."""
+    if is_battair_entry(entry):
+        await async_setup_battair(hass, entry, async_add_entities)
+        return
+
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
     entities = [ISDTC4RSSISensor(coordinator)]

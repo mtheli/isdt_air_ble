@@ -1,6 +1,6 @@
 """Decode the BattAir captures from issue #15 with the probe script.
 
-The expected values are what the BattAir app showed for the same packs
+The expected values are the reference values posted for the same packs
 at the time of the capture (screenshots in issue #15).
 """
 
@@ -71,7 +71,7 @@ def test_advert_capacity_matches_pack_names() -> None:
     assert seen > 5
 
 
-def test_connect_4s_pack_matches_app() -> None:
+def test_connect_4s_pack_matches_reference() -> None:
     resp = _responses()
     assert resp["CellVoltages"]["cells_mv"] == [3815, 3804, 3816, 3807]
     assert resp["HardwareInfo"]["hardware"] == "2.0"

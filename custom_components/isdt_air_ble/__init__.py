@@ -29,6 +29,7 @@ from .const import (
     DeviceType,
     ISDT_MANUFACTURER_ID,
     detect_model_from_mfg_data,
+    is_battair_entry,
     model_id_from_mfg_data,
     get_channel_count,
     get_device_type,
@@ -36,6 +37,7 @@ from .const import (
     is_sub_device_identifier,
     should_inherit_area,
 )
+from .battair_coordinator import BattAirCoordinator
 from .coordinator import ISDTDataUpdateCoordinator
 from .frontend import (
     async_ensure_card_resource,
@@ -47,6 +49,7 @@ from .helpers import async_get_own_device
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SWITCH, Platform.SELECT, Platform.UPDATE]
+BATTAIR_PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -58,8 +61,25 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+def _platforms(entry: ConfigEntry) -> list[Platform]:
+    return BATTAIR_PLATFORMS if is_battair_entry(entry) else PLATFORMS
+
+
+async def _async_setup_battair_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up a BattAir pack or plugin: advertisements only, no connection."""
+    coordinator = BattAirCoordinator(hass, entry.data["address"])
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][entry.entry_id] = coordinator
+    await hass.config_entries.async_forward_entry_setups(entry, BATTAIR_PLATFORMS)
+    entry.async_on_unload(coordinator.async_start())
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up ISDT Air BLE from a config entry."""
+    if is_battair_entry(entry):
+        return await _async_setup_battair_entry(hass, entry)
+
     # Removing the last entry deletes the card's Lovelace resource, so a
     # later re-add must restore it without a restart.
     await async_ensure_card_resource(hass)
@@ -316,11 +336,14 @@ def _mfg_data_from_cache(hass: HomeAssistant, address: str) -> bytes | None:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(
+        entry, _platforms(entry)
+    )
 
     if unload_ok:
         coordinator = hass.data[DOMAIN].pop(entry.entry_id)
-        await coordinator.async_shutdown()
+        if not is_battair_entry(entry):
+            await coordinator.async_shutdown()
 
     return unload_ok
 
@@ -335,7 +358,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     remaining = [
         other
         for other in hass.config_entries.async_entries(DOMAIN)
-        if other.entry_id != entry.entry_id
+        if other.entry_id != entry.entry_id and not is_battair_entry(other)
     ]
     if not remaining:
         await async_remove_card_resource(hass)
