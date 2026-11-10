@@ -14,8 +14,8 @@ from homeassistant.const import (
     UnitOfPower,
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    EntityCategory,
 )
-from homeassistant.const import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -150,8 +150,8 @@ def _setup_charger_sensors(coordinator, entities):
                 )
             )
 
-        # Charge settings of the slot as the charger reports them (set in
-        # the ISDT app). Read-only, shown as diagnostics.
+        # Charge settings stored for the slot, as the charger reports
+        # them. Read-only, shown as diagnostics.
         if supports_charge_settings(coordinator.model):
             entities.extend(
                 [
@@ -454,7 +454,7 @@ class ISDTC4BatteryTypeSensor(ISDTC4AirSensorBase):
 class ISDTC4ChargeCurrentSettingSensor(ISDTC4AirSensorBase):
     """Charge current configured for the slot (A), as the charger reports it.
 
-    Slots the charger runs on its own detection report 0.
+    0 means automatic: the charger picks the current itself.
     """
 
     _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
@@ -468,7 +468,7 @@ class ISDTC4CutoffSettingSensor(ISDTC4AirSensorBase):
     """Full-charge cut-off configured for the slot, raw in mV.
 
     An absolute voltage for lithium and NiZn cells, the -dV delta for
-    NiMH/NiCd; 0 where the charger reports none.
+    NiMH/NiCd; 0 means the default for the chemistry.
     """
 
     _attr_native_unit_of_measurement = UnitOfElectricPotential.MILLIVOLT

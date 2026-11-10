@@ -332,8 +332,8 @@ def supports_cell_voltages(model: str) -> bool:
     return "A8" not in model.upper()
 
 
-# Round-cell chargers whose WorkState carries the slot's charge settings as
-# the ISDT app sets them (cut-off in bytes 20-21, capacity limit in mAh in
+# Round-cell chargers whose WorkState carries the charge settings stored
+# for the slot (cut-off in bytes 20-21, capacity limit in mAh in
 # bytes 32-35). Only verified on the C4 Air so far.
 CHARGE_SETTINGS_MODELS = frozenset({"C4 Air"})
 
@@ -341,6 +341,9 @@ CHARGE_SETTINGS_MODELS = frozenset({"C4 Air"})
 def supports_charge_settings(model: str) -> bool:
     """Whether a charger reports its per-slot charge settings."""
     return model in CHARGE_SETTINGS_MODELS
+
+
+_CHARGE_SETTING_KEYS = frozenset({"work_current", "cutoff_mv", "capacity_limit_mah"})
 
 
 def supports_energy(model: str) -> bool:
@@ -404,7 +407,8 @@ def is_stale_charger_unique_id(
     - per-channel entities on channels the model doesn't have,
     - per-slot entities on slots the model doesn't have,
     - cell-voltage entities on models without per-cell data,
-    - energy entities on models that report no energy.
+    - energy entities on models that report no energy,
+    - charge-setting entities on models that report no charge settings.
     """
     prefix = f"{address}_"
     if not unique_id.startswith(prefix):
@@ -418,6 +422,8 @@ def is_stale_charger_unique_id(
         key = m.group(2)
         if key == "energy_done_wh":
             return not supports_energy(model)
+        if key in _CHARGE_SETTING_KEYS:
+            return not supports_charge_settings(model)
         return bool(_CELL_KEY_RE.fullmatch(key)) and not supports_cell_voltages(model)
 
     m = _SLOT_UID_RE.match(rest)

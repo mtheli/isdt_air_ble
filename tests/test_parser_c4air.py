@@ -349,7 +349,7 @@ def test_k4_uses_balance_charger_enums():
 
 
 def test_c4air_charge_settings_decoded_raw():
-    """Synthetic check: a slot configured in the ISDT app (Li-ion, 0.5 A,
+    """Synthetic check: a slot with fixed settings (Li-ion, 0.5 A,
     4200 mV cut-off, 2000 mAh limit) reports its settings in WorkState."""
     frame = bytearray(38)
     frame[0] = 0x31

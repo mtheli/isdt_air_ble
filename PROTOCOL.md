@@ -235,12 +235,12 @@ Offset  Length  Field                       Unit / Values
 17      1       Battery type                See table below
 18      1       Unit serials count
 19      1       Link type
-20      2       Full charged voltage        mV (LE) → ÷1000 = V
-22      4       Work current                mA (LE) → ÷1000 = A
+20      2       Full charged voltage        mV (LE); C4 Air: cut-off setting of the slot (mV, -dV delta for NiMH/NiCd), 0 = none
+22      4       Work current                mA (LE) → ÷1000 = A; C4 Air: charge current setting, 0 = none
 26      2       Battery count (whole)       LE
 28      2       Battery count (current)     LE
 30      2       Min input voltage           mV (LE) → ÷1000 = V
-32      4       Max output power            mW (LE) → ÷1000 = W
+32      4       Max output power            mW (LE) → ÷1000 = W; C4 Air: capacity limit of the slot in mAh, 0 = no limit
 36      2       Error code                  LE (0 = no error)
 38      1       Parallel state (optional)   0 or 1
 ```
