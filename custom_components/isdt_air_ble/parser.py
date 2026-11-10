@@ -452,6 +452,12 @@ def parse_workstate(data: bytes, model: str = "C4 Air") -> dict:
         "charging_battery_num_current":  charging_battery_num_current,
         "min_input_volt":                min_input_volt,
         "max_output_power":              max_output_power,
+        # Raw charge settings of the slot as the ISDT app sets them, on
+        # round-cell chargers: the cut-off is in mV (the -dV delta for
+        # NiMH/NiCd) and bytes 32-35 carry the capacity limit in mAh
+        # (0 = no limit), not a power value.
+        "cutoff_mv":                     int.from_bytes(data[20:22], "little"),
+        "capacity_limit_mah":            int.from_bytes(data[32:36], "little"),
         "error_code":                    error_code,
         "parallel_state":                parallel_state,
         # Aliases: sensors read these keys from ElectricResp on C4 Air,

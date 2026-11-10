@@ -92,6 +92,15 @@
       "battery_type": {
         "name": "Battery Type"
       },
+      "charge_current_setting": {
+        "name": "Charge current setting"
+      },
+      "cutoff_setting": {
+        "name": "Cut-off setting"
+      },
+      "capacity_limit_setting": {
+        "name": "Capacity limit setting"
+      },
       "internal_resistance": {
         "name": "Internal Resistance"
       },

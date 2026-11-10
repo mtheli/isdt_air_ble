@@ -332,6 +332,17 @@ def supports_cell_voltages(model: str) -> bool:
     return "A8" not in model.upper()
 
 
+# Round-cell chargers whose WorkState carries the slot's charge settings as
+# the ISDT app sets them (cut-off in bytes 20-21, capacity limit in mAh in
+# bytes 32-35). Only verified on the C4 Air so far.
+CHARGE_SETTINGS_MODELS = frozenset({"C4 Air"})
+
+
+def supports_charge_settings(model: str) -> bool:
+    """Whether a charger reports its per-slot charge settings."""
+    return model in CHARGE_SETTINGS_MODELS
+
+
 def supports_energy(model: str) -> bool:
     """Whether a charger reports the charged energy (mWh) per slot.
 

@@ -15,6 +15,7 @@ from homeassistant.const import (
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
 )
+from homeassistant.const import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -26,6 +27,7 @@ from .const import (
     get_port_count,
     get_port_labels,
     supports_cell_voltages,
+    supports_charge_settings,
     supports_energy,
 )
 from .helpers import main_device_info, slot_device_info, port_device_info
@@ -146,6 +148,35 @@ def _setup_charger_sensors(coordinator, entities):
                     channel=ch,
                     slot=slot,
                 )
+            )
+
+        # Charge settings of the slot as the charger reports them (set in
+        # the ISDT app). Read-only, shown as diagnostics.
+        if supports_charge_settings(coordinator.model):
+            entities.extend(
+                [
+                    ISDTC4ChargeCurrentSettingSensor(
+                        coordinator,
+                        "charge_current_setting",
+                        "work_current",
+                        channel=ch,
+                        slot=slot,
+                    ),
+                    ISDTC4CutoffSettingSensor(
+                        coordinator,
+                        "cutoff_setting",
+                        "cutoff_mv",
+                        channel=ch,
+                        slot=slot,
+                    ),
+                    ISDTC4CapacityLimitSettingSensor(
+                        coordinator,
+                        "capacity_limit_setting",
+                        "capacity_limit_mah",
+                        channel=ch,
+                        slot=slot,
+                    ),
+                ]
             )
 
         # A8 Air doesn't support individual cell voltage monitoring
@@ -418,6 +449,39 @@ class ISDTC4BatteryTypeSensor(ISDTC4AirSensorBase):
     """Battery chemistry sensor (NiMH, LiPo, etc.)."""
 
     _attr_icon = "mdi:battery-heart-variant"
+
+
+class ISDTC4ChargeCurrentSettingSensor(ISDTC4AirSensorBase):
+    """Charge current configured for the slot (A), as the charger reports it.
+
+    Slots the charger runs on its own detection report 0.
+    """
+
+    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
+    _attr_device_class = SensorDeviceClass.CURRENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_suggested_display_precision = 1
+    _attr_icon = "mdi:current-dc"
+
+
+class ISDTC4CutoffSettingSensor(ISDTC4AirSensorBase):
+    """Full-charge cut-off configured for the slot, raw in mV.
+
+    An absolute voltage for lithium and NiZn cells, the -dV delta for
+    NiMH/NiCd; 0 where the charger reports none.
+    """
+
+    _attr_native_unit_of_measurement = UnitOfElectricPotential.MILLIVOLT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:battery-arrow-up"
+
+
+class ISDTC4CapacityLimitSettingSensor(ISDTC4AirSensorBase):
+    """Capacity limit configured for the slot (mAh, 0 = no limit)."""
+
+    _attr_native_unit_of_measurement = "mAh"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:battery-lock"
 
 
 class ISDTC4IRSensor(ISDTC4AirSensorBase):

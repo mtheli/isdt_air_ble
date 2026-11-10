@@ -346,3 +346,37 @@ def test_k4_uses_balance_charger_enums():
         assert parsed[ch]["battery_type_str"] == "LiPo"
         assert parsed[ch]["work_state_str"] == "charging"
         assert parsed[ch]["unit_serials_num"] == 8
+
+
+def test_c4air_charge_settings_decoded_raw():
+    """Synthetic check: a slot configured in the ISDT app (Li-ion, 0.5 A,
+    4200 mV cut-off, 2000 mAh limit) reports its settings in WorkState."""
+    frame = bytearray(38)
+    frame[0] = 0x31
+    frame[1] = 0xE7
+    frame[2] = 0x00
+    frame[17] = 0x01                                  # battery_type = Li-ion
+    frame[20:22] = (4200).to_bytes(2, "little")       # cut-off, mV
+    frame[22:26] = (500).to_bytes(4, "little")        # work current, mA
+    frame[32:36] = (2000).to_bytes(4, "little")       # capacity limit, mAh
+    parsed, _ = parse_charger_responses(
+        [bytes(frame)], num_channels=1, model="C4 Air"
+    )
+    slot = parsed[0]
+    assert slot["battery_type_str"] == "LiIon"
+    assert slot["work_current"] == 0.5
+    assert slot["cutoff_mv"] == 4200
+    assert slot["capacity_limit_mah"] == 2000
+
+
+def test_c4air_capture_reports_settings_as_is():
+    """The captured charger reports battery type 4 (NiMH/Cd) or 6 (Auto)
+    with no current, cut-off or limit set; the parser passes that through
+    unchanged instead of deriving anything from it."""
+    parsed, _ = _replay("1cell_charging.jsonl")
+    for ch in range(6):
+        assert parsed[ch]["cutoff_mv"] == 0
+        assert parsed[ch]["capacity_limit_mah"] == 0
+        assert parsed[ch]["work_current"] == 0.0
+    assert parsed[0]["battery_type_str"] == "NiMH/Cd"
+    assert parsed[2]["battery_type_str"] == "Auto"
