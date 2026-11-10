@@ -106,6 +106,12 @@ Other BLE-enabled ISDT devices using the same protocol may also work. The integr
 | Battery Type | Text | Detected chemistry (LiPo, NiMH, LiFe, etc.) |
 | Internal Resistance | mOhm | Battery internal resistance |
 | Cell 1–16 Voltage | Voltage (V) | Individual cell voltages (C4 Air only, disabled by default) |
+| Charge Current Setting | Current (A), diagnostic | Charge current set for the slot, as the charger reports it; 0 when none is set (C4 Air only) |
+| Cut-off Setting | mV, diagnostic | Full-charge cut-off set for the slot, raw (the -dV delta for NiMH/NiCd); 0 when none is set (C4 Air only) |
+| Capacity Limit Setting | mAh, diagnostic | Capacity limit set for the slot, 0 = no limit (C4 Air only) |
+
+The three setting sensors show the per-slot charge settings made in the ISDT app, read from the slot's work state. They
+are read-only.
 
 ### MASS2 USB Adapter
 
