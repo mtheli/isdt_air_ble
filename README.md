@@ -6,7 +6,7 @@
 
 Custom Home Assistant integration for **ISDT chargers** and the **MASS2** USB power adapter with Bluetooth Low Energy (BLE) connectivity. Communicates directly with the device via a persistent BLE connection — no cloud, no app required.
 
-Supports the **C4 Air** (6-channel charger), **A8 Air** (8-channel charger), **Air 8** (1S–8S LiPo balance charger), and **MASS2** (8-port USB adapter).
+Supports the **C4 Air** (6-channel charger), **A8 Air** (8-channel charger), **Air 8** (1S–8S LiPo balance charger), and **MASS2** (8-port USB adapter). **BattAir** smart packs and plugins are read from their Bluetooth broadcasts, without a connection (beta).
 
 ![Device Overview](images/device_overview.png)
 
@@ -19,6 +19,7 @@ Supports the **C4 Air** (6-channel charger), **A8 Air** (8-channel charger), **A
 - [Features](#features)
   - [Chargers (C4 Air, A8 Air)](#chargers-c4-air-a8-air)
   - [MASS2 USB Adapter](#mass2-usb-adapter)
+  - [BattAir packs and plugins](#battair-packs-and-plugins)
 - [Screenshots](#screenshots)
 - [Installation](#installation)
 - [Setup](#setup)
@@ -41,6 +42,21 @@ device_id: <your-device-id>
 
 ![ISDT Charger Card](images/lovelace_card.png)
 
+### BattAir card
+
+A second card, `custom:isdt-battair-card`, lists all BattAir packs and plugins on one card, one line per pack. Packs with a problem (error log, low cell voltage, temperature below 5 °C or above 45 °C) move to the top with the problem in red; storage discharge and transport mode show as icons. Packs that are out of range stay in the list with the time they were last seen. It finds the packs by itself, no configuration needed:
+
+```yaml
+type: custom:isdt-battair-card
+# optional:
+title: Flight packs
+sort: name            # name | charge | last_seen
+hide_unavailable: false
+show_cycles: false
+```
+
+![ISDT BattAir Card](images/battair_card.png)
+
 > **Upgrading from the standalone card?** The card was previously installed separately from [isdt_air_card](https://github.com/mtheli/isdt_air_card). If that copy is still installed, remove it: in HACS remove *ISDT Charger Card* (this also removes the dashboard resource), or delete the manually added resource under *Settings → Dashboards → Resources*. A leftover standalone copy can shadow the bundled, up-to-date card; the integration raises a repair issue if it finds one. Your dashboards keep working unchanged, the card type stays `custom:isdt-charger-card`. Card development continues in that repository; releases ship here.
 
 ## Tested Models
@@ -61,6 +77,8 @@ device_id: <your-device-id>
 | **USB power adapters** | | |
 | [MASS2](https://www.isdt.co/mass2.html?lang=en) (8 USB ports) | :white_check_mark: | Maintainer |
 | [Power 200 / 200H / 200X](https://www.isdt.co/power200.html?lang=en) (wireless pad + 4 USB ports) | :white_check_mark: | Community ([#5](https://github.com/mtheli/isdt_air_ble/issues/5), 200H) |
+| **Smart battery packs** | | |
+| BattAir packs and BattAir Plugin (BAP2/4/6) | :white_check_mark: (beta) | Community ([#15](https://github.com/mtheli/isdt_air_ble/issues/15), captures) |
 
 Other BLE-enabled ISDT devices using the same protocol may also work. The integration auto-detects the model from the Bluetooth advertisement and creates one sub-device per slot or port (6 for the C4 Air, 8 for the A8 Air, 2 for the NP2 Air, 1 pack with per-cell voltages for the Air 8, 8 USB ports for the MASS2), with only the entities the model supports. If your model works, please [let me know](https://github.com/mtheli/isdt_air_ble/issues) so I can add it to the list!
 
@@ -135,6 +153,27 @@ are read-only.
 | Current | Current (A) | Output current |
 | Power | Power (W) | Current power draw |
 | Protocol | Enum | Charging protocol (`None`, `USB PD`, `Fast Charge`) |
+
+### BattAir packs and plugins
+
+BattAir packs and plugins are not paired and not connected. Each one appears under **Discovered** and is set up with a single confirmation; all values come from the broadcast the pack sends about once a second (measurements refresh about once a minute). A pack that has not been heard for 15 to 20 minutes goes unavailable, *Last seen* keeps the time it was last heard.
+
+| Entity | Type | Description |
+|--------|------|-------------|
+| Voltage | Voltage (V) | Pack voltage |
+| Average cell voltage | Voltage (V) | Pack voltage divided by the number of cells |
+| Charge level | Battery (%) | Charge level as the pack reports it |
+| Temperature | Temperature (°C) | Pack temperature |
+| Cycles | Count | Charge cycles |
+| Low average cell voltage | Binary (Problem) | Average cell voltage below 3.0 V (LiPo, LiHV and LiUHV packs) |
+| Error log | Binary (Problem) | The pack has logged errors (over-temperature, over-voltage, over-discharge) |
+| Storage discharge | Binary | The pack is discharging itself to storage voltage |
+| Transport mode | Binary, diagnostic | Transport mode is on |
+| Cells, Capacity, Battery type | diagnostic | Pack configuration |
+| Last seen | Timestamp, diagnostic | Time of the last broadcast |
+| Signal strength | RSSI (dBm), diagnostic | Disabled by default |
+
+Individual cell voltages are not in the broadcast and are not available.
 
 ## Screenshots
 
