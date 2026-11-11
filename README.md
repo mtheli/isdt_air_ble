@@ -1,6 +1,6 @@
 # ISDT Air BLE – Home Assistant Integration
 
-[![HACS Default](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/default)
+[![Home Assistant Marketplace](https://img.shields.io/badge/Marketplace-listed-41BDF5.svg)](https://www.home-assistant.io/integrations/marketplace/)
 [![GitHub Release](https://img.shields.io/github/v/release/mtheli/isdt_air_ble)](https://github.com/mtheli/isdt_air_ble/releases)
 [![License: MIT](https://img.shields.io/github/license/mtheli/isdt_air_ble)](LICENSE)
 
@@ -41,7 +41,7 @@ device_id: <your-device-id>
 
 ![ISDT Charger Card](images/lovelace_card.png)
 
-> **Upgrading from the standalone card?** The card was previously installed separately from [isdt_air_card](https://github.com/mtheli/isdt_air_card). If that copy is still installed, remove it: in HACS remove *ISDT Charger Card* (this also removes the dashboard resource), or delete the manually added resource under *Settings → Dashboards → Resources*. A leftover standalone copy can shadow the bundled, up-to-date card; the integration raises a repair issue if it finds one. Your dashboards keep working unchanged, the card type stays `custom:isdt-charger-card`. Card development continues in that repository; releases ship here.
+> **Upgrading from the standalone card?** The card was previously installed separately from [isdt_air_card](https://github.com/mtheli/isdt_air_card). If that copy is still installed, remove it: remove *ISDT Charger Card* in the Marketplace (in HACS before Home Assistant 2026.11; this also removes the dashboard resource), or delete the manually added resource under *Settings → Dashboards → Resources*. A leftover standalone copy can shadow the bundled, up-to-date card; the integration raises a repair issue if it finds one. Your dashboards keep working unchanged, the card type stays `custom:isdt-charger-card`. Card development continues in that repository; releases ship here.
 
 ## Tested Models
 
@@ -144,13 +144,13 @@ are read-only.
 
 ## Installation
 
-### HACS (recommended)
+### Marketplace (recommended)
 
-This integration is available in the **default HACS store** — just click the button below, or search HACS for "ISDT".
+This integration is listed in the Home Assistant **Marketplace**. Click the button below, or go to **Settings → Marketplace** and search for "ISDT". Select **Install** and the setup starts right away, no restart needed.
 
-[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mtheli&repository=isdt_air_ble&category=integration)
+[![Open in the Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=mtheli&repository=isdt_air_ble&category=integration)
 
-Then restart Home Assistant.
+Requires Home Assistant 2025.1 or newer. On Home Assistant before 2026.11, the button opens the repository in [HACS](https://hacs.xyz/docs/use/) instead. Download it there and restart Home Assistant.
 
 <details>
 <summary>Manual installation</summary>
@@ -181,7 +181,7 @@ The command interval is the pause between two Bluetooth commands while polling. 
 ## Blueprints
 
 Optional Home Assistant automation blueprints for common use cases. They are
-not installed with the integration through HACS; import each one separately
+not installed with the integration through the Marketplace; import each one separately
 into Home Assistant.
 
 ### Charging Completion
