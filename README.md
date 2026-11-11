@@ -44,7 +44,7 @@ device_id: <your-device-id>
 
 ### BattAir card
 
-A second card, `custom:isdt-battair-card`, lists all BattAir packs and plugins on one card, one line per pack. Packs with a problem (error log, low cell voltage, temperature below 5 °C or above 45 °C) move to the top with the problem in red; storage discharge and transport mode show as icons. Packs that are out of range stay in the list with the time they were last seen. It finds the packs by itself, no configuration needed:
+A second card, `custom:isdt-battair-card`, lists all BattAir packs and plugins on one card, one line per pack. Packs with a problem (error log, low cell voltage, temperature below 5 °C or above 45 °C) move to the top with the problem in red; storage discharge and transport mode show as icons. Packs that are out of range stay in the list with the time they were last seen. It finds the packs by itself, no configuration needed: add **ISDT BattAir Card** from the dashboard card picker (it is also suggested when you add a card for a BattAir entity), or in YAML:
 
 ```yaml
 type: custom:isdt-battair-card
