@@ -163,3 +163,5 @@ def test_default_title():
     assert default_title(advert, "54:14:A7:EF:88:AD") == "BattAir 4S 1300 mAh 88AD"
     assert default_title(advert, "54:14:A7:EF:88:AD", "BATAIRBattAir") == "BattAir 4S 1300 mAh 88AD"
     assert default_title(None, "54:14:A7:EF:88:AD") == "BattAir 88AD"
+    assert default_title(advert, "54:14:A7:EF:66:E3", "BATAIRBattAir-2s-900-20002") == "BattAir-2s-900-20002"
+    assert default_title(advert, "54:14:A7:EF:65:5D", "BATAIRBattAi-2s-2200-20001") == "BattAi-2s-2200-20001"

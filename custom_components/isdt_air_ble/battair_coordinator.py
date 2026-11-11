@@ -3,7 +3,9 @@
 Only listens to advertisements, never connects. Packs advertise about once
 a second, but the readings change at most once a minute, so listeners are
 only notified when a value changes, when availability changes, or at the
-latest every HEARTBEAT seconds (for RSSI).
+latest every HEARTBEAT seconds. Home Assistant does not pass on repeated
+identical advertisements, so a pack in storage may not trigger a callback
+for a long time; last_seen_time() reads the Bluetooth history instead.
 """
 
 from __future__ import annotations
@@ -11,6 +13,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 import logging
 import time
+
+from bluetooth_data_tools import monotonic_time_coarse
 
 from homeassistant.components.bluetooth import (
     BluetoothChange,
@@ -44,7 +48,6 @@ class BattAirCoordinator(PassiveBluetoothDataUpdateCoordinator):
         )
         self.data: BattAirAdvert | None = None
         self.rssi: int | None = None
-        self.last_seen_at: datetime | None = None
         self._last_key: tuple | None = None
         self._last_notify = 0.0
         self._was_available = self._available
@@ -60,10 +63,6 @@ class BattAirCoordinator(PassiveBluetoothDataUpdateCoordinator):
         payload = service_info.manufacturer_data.get(BATTAIR_MANUFACTURER_ID)
         advert = decode_advert(payload)
         self.rssi = service_info.rssi
-        # service_info.time is monotonic; turn it into wall-clock time so a
-        # cached advertisement keeps its real age.
-        age = max(0.0, time.monotonic() - service_info.time)
-        self.last_seen_at = dt_util.utcnow() - timedelta(seconds=age)
         if advert is None:
             if payload is not None:
                 _LOGGER.debug(
@@ -81,6 +80,19 @@ class BattAirCoordinator(PassiveBluetoothDataUpdateCoordinator):
         self._last_key = key
         self.data = advert
         return True
+
+    def last_seen_time(self) -> datetime | None:
+        """Wall-clock time of the last advertisement Home Assistant received.
+
+        While the device is in range this comes from the Bluetooth history;
+        once it is gone, from the time recorded when it went unavailable.
+        """
+        info = async_last_service_info(self.hass, self.address, connectable=False)
+        monotonic = info.time if info is not None else self._last_unavailable_time
+        if not monotonic:
+            return None
+        age = max(0.0, monotonic_time_coarse() - monotonic)
+        return dt_util.utcnow() - timedelta(seconds=age)
 
     @callback
     def _async_handle_bluetooth_event(

@@ -227,6 +227,9 @@ def default_title(
     model = advert.model if advert is not None else MODEL_PACK
     name = pack_name(local_name)
     if name:
+        # Names like 'BattAir-2s-900-1' already say what it is.
+        if name.lower().startswith("battai"):
+            return name
         return f"{model} {name}"
     suffix = address.replace(":", "")[-4:].upper()
     parts = [model]

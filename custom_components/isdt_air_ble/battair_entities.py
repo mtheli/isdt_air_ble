@@ -33,6 +33,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 
 from .battair import BATTERY_TYPES, MODEL_PACK, BattAirAdvert
 from .battair_coordinator import BattAirCoordinator
@@ -45,11 +46,12 @@ LAST_SEEN_WRITE_INTERVAL = timedelta(minutes=15)
 
 def _device_info(coordinator: BattAirCoordinator, entry: ConfigEntry) -> DeviceInfo:
     advert = coordinator.data
+    model = advert.model if advert is not None else entry.data.get("model", MODEL_PACK)
     return DeviceInfo(
         identifiers={(DOMAIN, coordinator.address)},
         connections={(dr.CONNECTION_BLUETOOTH, coordinator.address)},
         manufacturer="ISDT",
-        model=advert.model if advert is not None else entry.data.get("model", MODEL_PACK),
+        model=model,
         name=entry.title,
     )
 
@@ -193,6 +195,20 @@ class BattAirLastSeenSensor(BattAirEntity, RestoreSensor):
             if isinstance(last.native_value, datetime):
                 self._value = last.native_value
         self._update_value()
+        # Repeated identical advertisements do not reach the coordinator, so
+        # refresh from the Bluetooth history on a timer.
+        self.async_on_remove(
+            async_track_time_interval(
+                self.hass, self._async_refresh, LAST_SEEN_WRITE_INTERVAL
+            )
+        )
+
+    @callback
+    def _async_refresh(self, _now: datetime) -> None:
+        before = self._value
+        self._update_value(force=True)
+        if self._value != before:
+            self.async_write_ha_state()
 
     @property
     def available(self) -> bool:
@@ -202,12 +218,17 @@ class BattAirLastSeenSensor(BattAirEntity, RestoreSensor):
     def native_value(self) -> datetime | None:
         return self._value
 
-    def _update_value(self) -> None:
-        seen = self.coordinator.last_seen_at
+    def _update_value(self, force: bool = False) -> None:
+        seen = self.coordinator.last_seen_time()
         if seen is None:
             return
+        # Only move forward: the restored value may be newer than a cached
+        # advertisement after a restart.
+        if self._value is not None and seen <= self._value:
+            return
         if (
-            self._value is None
+            force
+            or self._value is None
             or not self.coordinator.available
             or seen - self._value >= LAST_SEEN_WRITE_INTERVAL
         ):
