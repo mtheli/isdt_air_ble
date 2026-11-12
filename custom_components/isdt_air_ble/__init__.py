@@ -37,6 +37,7 @@ from .const import (
     is_sub_device_identifier,
     should_inherit_area,
 )
+from .battair import BATTAIR_MANUFACTURER_ID, decode_advert, default_title, legacy_title
 from .battair_coordinator import BattAirCoordinator
 from .coordinator import ISDTDataUpdateCoordinator
 from .frontend import (
@@ -65,8 +66,29 @@ def _platforms(entry: ConfigEntry) -> list[Platform]:
     return BATTAIR_PLATFORMS if is_battair_entry(entry) else PLATFORMS
 
 
+@callback
+def _async_fix_battair_title(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Rename entries that v0.15.0-beta.1 titled from the whole advertised name.
+
+    It kept four characters after the 16-byte name field, so 'BattAir-2s-900-1'
+    became 'BattAir-2s-900-10002' and unnamed packs became 'BattAir 0001'. Only
+    titles that still match that old default are changed.
+    """
+    address = entry.data["address"]
+    info = async_last_service_info(hass, address, connectable=False)
+    if info is None:
+        return
+    advert = decode_advert(info.manufacturer_data.get(BATTAIR_MANUFACTURER_ID))
+    old = legacy_title(advert, address, info.name)
+    new = default_title(advert, address, info.name)
+    if old != new and entry.title == old:
+        _LOGGER.info("Renaming BattAir entry %s from '%s' to '%s'", address, old, new)
+        hass.config_entries.async_update_entry(entry, title=new)
+
+
 async def _async_setup_battair_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a BattAir pack or plugin: advertisements only, no connection."""
+    _async_fix_battair_title(hass, entry)
     coordinator = BattAirCoordinator(hass, entry.data["address"])
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator

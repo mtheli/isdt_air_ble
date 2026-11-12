@@ -2075,7 +2075,8 @@ const $309cd1a055a0ccab$var$SORTS = [
     "charge",
     "last_seen"
 ];
-// Temperature outside this range counts as a problem (°C).
+// Temperature outside this range counts as a problem (°C). The sensor reports
+// in the unit set in Home Assistant, so °F is converted before comparing.
 const $309cd1a055a0ccab$var$TEMP_LOW = 5;
 const $309cd1a055a0ccab$var$TEMP_HIGH = 45;
 const $309cd1a055a0ccab$var$esc = (s)=>String(s ?? "").replace(/[&<>"']/g, (c)=>({
@@ -2218,6 +2219,7 @@ class $309cd1a055a0ccab$export$dad56d593e92344c extends HTMLElement {
                 voltage: num("voltage"),
                 cell: num("cell_voltage_avg"),
                 temperature: num("temperature"),
+                temperatureUnit: st("temperature")?.attributes?.unit_of_measurement || "\xb0C",
                 cycles: num("cycles"),
                 cells: num("cells"),
                 capacity: num("capacity"),
@@ -2261,11 +2263,12 @@ class $309cd1a055a0ccab$export$dad56d593e92344c extends HTMLElement {
             entity: p.ids.cell_voltage_low,
             text: p.cell != null ? `${(0, $d8078e452c66bdbe$export$625550452a3fa3ec)(h, "battair_low_cell")} \xb7 ${this._fmt(p.cell, 2)} V` : (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(h, "battair_low_cell")
         });
-        if (p.temperature != null && (p.temperature < $309cd1a055a0ccab$var$TEMP_LOW || p.temperature > $309cd1a055a0ccab$var$TEMP_HIGH)) w.push({
+        const celsius = p.temperature == null ? null : p.temperatureUnit === "\xb0F" ? (p.temperature - 32) * 5 / 9 : p.temperature;
+        if (celsius != null && (celsius < $309cd1a055a0ccab$var$TEMP_LOW || celsius > $309cd1a055a0ccab$var$TEMP_HIGH)) w.push({
             cls: "error",
             icon: "mdi:thermometer-alert",
             entity: p.ids.temperature,
-            text: `${(0, $d8078e452c66bdbe$export$625550452a3fa3ec)(h, "battair_temperature_alert")} \xb7 ${this._fmt(p.temperature, 0)} \xb0C`
+            text: `${(0, $d8078e452c66bdbe$export$625550452a3fa3ec)(h, "battair_temperature_alert")} \xb7 ${this._fmt(p.temperature, 0)} ${p.temperatureUnit}`
         });
         if (p.storage) w.push({
             cls: "info",
@@ -2592,7 +2595,7 @@ if (!customElements.get((0, $309cd1a055a0ccab$export$8b990d5e24cdbf9))) {
         name: "ISDT BattAir Card",
         description: "Overview of all ISDT BattAir packs and plugins: charge level, voltage and warnings",
         preview: true,
-        documentationURL: "https://github.com/mtheli/isdt_air_ble#battair",
+        documentationURL: "https://github.com/mtheli/isdt_air_ble#battair-card",
         getEntitySuggestion: (hass, entityId)=>(0, $309cd1a055a0ccab$export$d0c0f9837c20bb42)(hass, entityId) ? {
                 config: {
                     type: `custom:${0, $309cd1a055a0ccab$export$8b990d5e24cdbf9}`

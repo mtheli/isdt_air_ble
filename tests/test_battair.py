@@ -10,6 +10,7 @@ from isdt_air_ble.battair import (
     decode_advert,
     default_title,
     is_battair,
+    legacy_title,
     pack_name,
 )
 
@@ -151,9 +152,13 @@ def test_second_scan_packs_are_not_plugins():
 
 
 def test_pack_name():
-    assert pack_name("BATAIRBattAi-2s-2200-20001") == "BattAi-2s-2200-20001"
+    # 16-byte name field, then four characters that are not part of the name.
+    assert pack_name("BATAIRBattAi-2s-2200-20001") == "BattAi-2s-2200-2"
+    assert pack_name("BATAIRBattAir-2s-900-50002") == "BattAir-2s-900-5"
     assert pack_name("BATAIRovonic1550      0000") == "ovonic1550"
     assert pack_name("BATAIRBattAir") is None
+    assert pack_name("BATAIRBattAir         0001") is None
+    assert pack_name("BATAIRshort\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00") == "short"
     assert pack_name("54-14-A7-EF-34-CA") is None
     assert pack_name(None) is None
 
@@ -163,5 +168,16 @@ def test_default_title():
     assert default_title(advert, "54:14:A7:EF:88:AD") == "BattAir 4S 1300 mAh 88AD"
     assert default_title(advert, "54:14:A7:EF:88:AD", "BATAIRBattAir") == "BattAir 4S 1300 mAh 88AD"
     assert default_title(None, "54:14:A7:EF:88:AD") == "BattAir 88AD"
-    assert default_title(advert, "54:14:A7:EF:66:E3", "BATAIRBattAir-2s-900-20002") == "BattAir-2s-900-20002"
-    assert default_title(advert, "54:14:A7:EF:65:5D", "BATAIRBattAi-2s-2200-20001") == "BattAi-2s-2200-20001"
+    assert default_title(advert, "54:14:A7:EF:88:AD", "BATAIRBattAir         0001") == "BattAir 4S 1300 mAh 88AD"
+    assert default_title(advert, "54:14:A7:EF:66:E3", "BATAIRBattAir-2s-900-20002") == "BattAir-2s-900-2"
+    assert default_title(advert, "54:14:A7:EF:65:5D", "BATAIRBattAi-2s-2200-20001") == "BattAi-2s-2200-2"
+
+
+def test_legacy_title_matches_beta1_names():
+    """The titles v0.15.0-beta.1 created, so setup can rename those entries."""
+    advert = decode_advert(bytes.fromhex("10 00 00 00 f3 05 21 14 01 00 04 82 00 00 ff ff ff ff"))
+    assert legacy_title(advert, "54:14:A7:EF:66:E3", "BATAIRBattAir-2s-900-20002") == "BattAir-2s-900-20002"
+    assert legacy_title(advert, "54:14:A7:EF:88:AD", "BATAIRBattAir         0001") == "BattAir         0001"
+    assert legacy_title(advert, "54:14:A7:02:5F:B1", "BATAIRovonic1550      0000") == default_title(
+        advert, "54:14:A7:02:5F:B1", "BATAIRovonic1550      0000"
+    )

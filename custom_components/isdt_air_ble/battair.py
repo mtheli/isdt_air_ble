@@ -200,13 +200,29 @@ def is_battair(
 _MAC_NAME_RE = re.compile(r"^[0-9A-Fa-f]{2}([-:][0-9A-Fa-f]{2}){5}$")
 
 
+# The advertised name is 'BATAIR', the 16-byte name field set in the app,
+# and four more characters ('0000', '0001', ...) that are not part of the
+# name. The app reads exactly those 16 bytes as the pack name.
+_NAME_FIELD_LEN = 16
+
+
 def pack_name(local_name: str | None) -> str | None:
     """Return the user-given pack name from the advertised name.
 
-    The advertised name is 'BATAIR' followed by the name set for the pack,
-    padded with spaces and '0000'. Packs that were never named advertise
-    'BattAir' or their MAC address; those return None.
+    Packs that were never named advertise 'BattAir' or their MAC address;
+    those return None.
     """
+    if not local_name or not local_name.upper().startswith(BATTAIR_NAME_PREFIX):
+        return None
+    start = len(BATTAIR_NAME_PREFIX)
+    name = local_name[start:start + _NAME_FIELD_LEN].strip(" \x00")
+    if not name or name.lower() == "battair" or _MAC_NAME_RE.match(name):
+        return None
+    return name
+
+
+def _legacy_pack_name(local_name: str | None) -> str | None:
+    """Pack name as v0.15.0-beta.1 read it: the whole rest of the name."""
     if not local_name or not local_name.upper().startswith(BATTAIR_NAME_PREFIX):
         return None
     name = local_name[len(BATTAIR_NAME_PREFIX):]
@@ -224,8 +240,18 @@ def default_title(
     'BattAir ovonic1550' when the pack has its own name, otherwise
     'BattAir 4S 1300 mAh 88AD'.
     """
+    return _title(advert, address, pack_name(local_name))
+
+
+def legacy_title(
+    advert: BattAirAdvert | None, address: str, local_name: str | None = None
+) -> str:
+    """Title v0.15.0-beta.1 gave a pack, to rename entries it created."""
+    return _title(advert, address, _legacy_pack_name(local_name))
+
+
+def _title(advert: BattAirAdvert | None, address: str, name: str | None) -> str:
     model = advert.model if advert is not None else MODEL_PACK
-    name = pack_name(local_name)
     if name:
         # Names like 'BattAir-2s-900-1' already say what it is.
         if name.lower().startswith("battai"):
