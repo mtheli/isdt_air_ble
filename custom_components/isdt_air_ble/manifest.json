@@ -6,6 +6,7 @@
     { "manufacturer_id": 43962, "manufacturer_data_start": [175, 250] },
     { "service_uuid": "0000ba00-0000-1000-8000-00805f9b34fb", "connectable": false }
   ],
+  "categories": ["energy.solar_batteries"],
   "codeowners": ["@mtheli"],
   "config_flow": true,
   "dependencies": ["bluetooth", "frontend", "http", "lovelace"],
