@@ -8,7 +8,7 @@ Custom Home Assistant integration for **ISDT chargers** and the **MASS2** USB po
 
 Supports the **C4 Air** (6-channel charger), **A8 Air** (8-channel charger), **Air 8** (1S–8S LiPo balance charger), and **MASS2** (8-port USB adapter). **BattAir** smart packs and plugins are read from their Bluetooth broadcasts, without a connection (beta).
 
-![Device Overview](images/device_overview.png)
+[![Device Overview](images/device_overview.png)](images/device_overview.png)
 
 ---
 
@@ -40,7 +40,9 @@ type: custom:isdt-charger-card
 device_id: <your-device-id>
 ```
 
-![ISDT Charger Card](images/lovelace_card.png)
+| Light theme | Dark theme |
+| :---: | :---: |
+| [![ISDT Charger Card](images/lovelace_card.png)](images/lovelace_card.png) | [![ISDT Charger Card, dark theme](images/lovelace_card_dark.png)](images/lovelace_card_dark.png) |
 
 ### BattAir card
 
@@ -55,7 +57,7 @@ hide_unavailable: false
 show_cycles: false
 ```
 
-![ISDT BattAir Card](images/battair_card.png)
+[![ISDT BattAir Card](images/battair_card.png)](images/battair_card.png)
 
 > **Upgrading from the standalone card?** The card was previously installed separately from [isdt_air_card](https://github.com/mtheli/isdt_air_card). If that copy is still installed, remove it: remove *ISDT Charger Card* in the Marketplace (in HACS before Home Assistant 2026.11; this also removes the dashboard resource), or delete the manually added resource under *Settings → Dashboards → Resources*. A leftover standalone copy can shadow the bundled, up-to-date card; the integration raises a repair issue if it finds one. Your dashboards keep working unchanged, the card type stays `custom:isdt-charger-card`. Card development continues in that repository; releases ship here.
 
@@ -179,7 +181,7 @@ Individual cell voltages are not in the broadcast and are not available.
 
 | Config Flow | Device Overview | Slot Detail |
 |:-----------:|:---------------:|:-----------:|
-| ![Config Flow](images/config_flow.png) | ![Device Overview](images/device_overview.png) | ![Slot Detail](images/slot_detail.png) |
+| [![Config Flow](images/config_flow.png)](images/config_flow.png) | [![Device Overview](images/device_overview.png)](images/device_overview.png) | [![Slot Detail](images/slot_detail.png)](images/slot_detail.png) |
 
 ## Installation
 
