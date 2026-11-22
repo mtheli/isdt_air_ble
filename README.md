@@ -42,7 +42,7 @@ device_id: <your-device-id>
 
 | Light theme | Dark theme |
 | :---: | :---: |
-| [![ISDT Charger Card](images/lovelace_card.png)](images/lovelace_card.png) | [![ISDT Charger Card, dark theme](images/lovelace_card_dark.png)](images/lovelace_card_dark.png) |
+| [![ISDT Charger Card](images/lovelace_card.png)](images/lovelace_card.png) | <a href="images/lovelace_card_dark.png"><img src="images/lovelace_card_dark.png" alt="ISDT Charger Card, dark theme" width="414"></a> |
 
 ### BattAir card
 
