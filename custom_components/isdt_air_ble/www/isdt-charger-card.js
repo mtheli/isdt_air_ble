@@ -17,19 +17,102 @@ var $238d401f28c1db46$exports = {};
 $238d401f28c1db46$exports = JSON.parse('{"status_empty":"Leer","status_idle":"Bereit","status_charging":"L\xe4dt","status_done":"Fertig","status_error":"Fehler","header_input":"Input","header_current":"Strom","header_power":"Leistung","header_total_charge":"\u03A3 Ladung","info_volt":"Volt","info_amp":"Amp","info_time":"Zeit","info_type":"Typ","tooltip_connected":"Verbunden","tooltip_disconnected":"Getrennt","config_title":"Titel (optional \u2013 Standard ist Ger\xe4tename)","config_show_model":"Modell als Untertitel anzeigen","config_show_header":"Header mit Eingangswerten anzeigen","error_no_device":"Bitte ein Ger\xe4t ausw\xe4hlen","section_usbc":"USB-C","section_usba":"USB-A","gauge_of":"von","active_ports":"Aktive Ports","load":"Auslastung","volume":"Lautst\xe4rke","vol_low":"Leise","vol_medium":"Mittel","vol_high":"Laut","sound_mute":"Stumm","sound_low":"Leise","sound_medium":"Mittel","sound_high":"Laut","balance_channel":"Kanal","balance_no_pack":"kein Akku","outdated_standalone_active":"Eine veraltete separate Kopie dieser Karte ist aktiv. Entferne die separate ISDT Charger Card (siehe Einstellungen \u2192 Reparaturen), um die aktuelle, mit der Integration gelieferte Version zu nutzen.","battair_config_title":"Titel (optional, Standard ist BattAir)","battair_config_sort":"Sortierung","battair_sort_name":"Name","battair_sort_charge":"Ladestand (niedrigster zuerst)","battair_sort_last_seen":"Zuletzt gesehen","battair_config_hide_unavailable":"Packs au\xdfer Reichweite ausblenden","battair_config_show_cycles":"Ladezyklen anzeigen","battair_empty":"Keine BattAir-Packs gefunden. Packs in Bluetooth-Reichweite werden automatisch erkannt.","battair_all_hidden":"Alle Packs sind au\xdfer Reichweite.","battair_never_seen":"nie","battair_error_log":"Fehlerprotokoll","battair_low_cell":"Zellspannung niedrig","battair_storage":"Lagerentladung","battair_transport":"Transportmodus","battair_temperature_alert":"Temperatur","battair_last_seen":"Zuletzt gesehen","battair_cycle":"Zyklus","battair_cycles":"Zyklen","battair_stat_packs":"Packs","battair_stat_avg":"\xd8 Ladung","battair_stat_warnings":"Warnungen","battair_stat_away":"Offline"}');
 
 
+// Helpers shared by the charger and the BattAir card. No JSON imports here,
+// so the module also loads in plain node.
+/** Escape a string for use in innerHTML text and attribute values. */ const $b724747388f32094$export$a1a11b095f88289a = (s)=>String(s ?? "").replace(/[&<>"']/g, (c)=>({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;"
+        })[c]);
+function $b724747388f32094$export$ae08705376f8038d(hass) {
+    return hass?.locale?.language || hass?.language || "en";
+}
+// Same mapping as the Home Assistant frontend (numberFormatToLocale).
+function $b724747388f32094$var$numberLocale(hass) {
+    switch(hass?.locale?.number_format){
+        case "comma_decimal":
+            return [
+                "en-US",
+                "en"
+            ];
+        case "decimal_comma":
+            return [
+                "de",
+                "es",
+                "it"
+            ];
+        case "space_comma":
+            return [
+                "fr",
+                "sv",
+                "cs"
+            ];
+        case "quote_decimal":
+            return [
+                "de-CH"
+            ];
+        case "system":
+            return undefined;
+        default:
+            return $b724747388f32094$export$ae08705376f8038d(hass);
+    }
+}
+const $b724747388f32094$var$formatters = new Map();
+function $b724747388f32094$export$f5dd818bff069720(hass, value, digits = 0) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return String(value ?? "");
+    const none = hass?.locale?.number_format === "none";
+    const locale = none ? "en-US" : $b724747388f32094$var$numberLocale(hass);
+    const key = JSON.stringify([
+        locale,
+        digits,
+        none
+    ]);
+    let f = $b724747388f32094$var$formatters.get(key);
+    if (!f) {
+        try {
+            f = new Intl.NumberFormat(locale, {
+                minimumFractionDigits: digits,
+                maximumFractionDigits: digits,
+                ...none ? {
+                    useGrouping: false
+                } : {}
+            });
+        } catch (e) {
+            f = {
+                format: (x)=>x.toFixed(digits)
+            };
+        }
+        $b724747388f32094$var$formatters.set(key, f);
+    }
+    return f.format(n);
+}
+function $b724747388f32094$export$9fb280befa7ef4fc() {
+    const hass = document.querySelector("home-assistant")?.hass;
+    if (hass) return hass;
+    return {
+        language: document.documentElement.lang || "en"
+    };
+}
+
+
 const $d8078e452c66bdbe$var$LOCALES = {
     en: (/*@__PURE__*/$parcel$interopDefault($76eee68ef692a3c3$exports)),
     de: (/*@__PURE__*/$parcel$interopDefault($238d401f28c1db46$exports))
 };
 function $d8078e452c66bdbe$export$625550452a3fa3ec(hass, key) {
-    const lang = hass?.language || 'en';
-    const locale = $d8078e452c66bdbe$var$LOCALES[lang] || $d8078e452c66bdbe$var$LOCALES.en;
+    const lang = (0, $b724747388f32094$export$ae08705376f8038d)(hass);
+    // "de-CH" and similar regional variants fall back to the base language.
+    const locale = $d8078e452c66bdbe$var$LOCALES[lang] || $d8078e452c66bdbe$var$LOCALES[lang.split('-')[0]] || $d8078e452c66bdbe$var$LOCALES.en;
     return locale[key] || $d8078e452c66bdbe$var$LOCALES.en[key] || key;
 }
 
 
+
 // Written by the release sync script (isdt_air_ble scripts/sync_card.sh).
-const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.15.0";
+const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.15.1";
 const $8ee5ce714273e53b$export$9b657414b7dffe40 = "bundled";
 
 
@@ -65,7 +148,15 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         this._lastSlotKey = null;
     }
     static getConfigForm() {
+        // The editor gets no hass here: read the user's language from the
+        // Home Assistant root element so the labels follow it.
+        const labels = {
+            title: "config_title",
+            show_model: "config_show_model",
+            show_header: "config_show_header"
+        };
         return {
+            computeLabel: (schema)=>labels[schema.name] ? (0, $d8078e452c66bdbe$export$625550452a3fa3ec)((0, $b724747388f32094$export$9fb280befa7ef4fc)(), labels[schema.name]) : undefined,
             schema: [
                 {
                     name: "device_id",
@@ -87,14 +178,12 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
                 },
                 {
                     name: "title",
-                    label: (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(null, "config_title"),
                     selector: {
                         text: {}
                     }
                 },
                 {
                     name: "show_model",
-                    label: (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(null, "config_show_model"),
                     selector: {
                         boolean: {}
                     },
@@ -102,7 +191,6 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
                 },
                 {
                     name: "show_header",
-                    label: (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(null, "config_show_header"),
                     selector: {
                         boolean: {}
                     }
@@ -384,6 +472,9 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
     _t(key) {
         return (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(this._hass, key);
     }
+    _fmt(value, digits) {
+        return (0, $b724747388f32094$export$f5dd818bff069720)(this._hass, value, digits);
+    }
     /* ── Entity state helpers ───────────────────────────── */ _st(eid, fb) {
         if (!eid || !this._hass?.states[eid]) return fb ?? "unavailable";
         const s = this._hass.states[eid].state;
@@ -395,9 +486,9 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
     }
     /* Session text "555 mAh / 0.81 Wh". Chargers without an energy counter
      (NP2 Air, LP2 Air) have no energy_done entity: show mAh only. */ _sessionText(e) {
-        const mah = `${this._num(e?.capacity_done, 0).toFixed(0)} mAh`;
+        const mah = `${this._fmt(this._num(e?.capacity_done, 0), 0)} mAh`;
         if (!e?.energy_done) return mah;
-        return `${mah} / ${this._num(e.energy_done, 0).toFixed(2)} Wh`;
+        return `${mah} / ${this._fmt(this._num(e.energy_done, 0), 2)} Wh`;
     }
     /* ── Render ─────────────────────────────────────────── */ _render() {
         if (!this._hass || !this._config) return;
@@ -571,19 +662,19 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         let cellChipsHTML = "";
         for (const c of populatedCells){
             const driftClass = drift.has(c.index) ? " drift" : "";
-            const irHTML = c.ir != null ? `<div class="cell-ir">${c.ir.toFixed(1)}<small> m\u{3A9}</small></div>` : "";
+            const irHTML = c.ir != null ? `<div class="cell-ir">${this._fmt(c.ir, 1)}<small> m\u{3A9}</small></div>` : "";
             cellChipsHTML += `
         <div class="cell-cell${driftClass}" data-entity="${c.entityId}">
-          <div class="cell-v">${c.voltage.toFixed(2)}<small>V</small></div>
+          <div class="cell-v">${this._fmt(c.voltage, 2)}<small>V</small></div>
           ${irHTML}
           <span class="cell-no">${c.index + 1}</span>
         </div>`;
         }
         // Pack-info column
-        const statusLabel = this._t("status_" + status);
+        const statusLabel = (0, $b724747388f32094$export$a1a11b095f88289a)(this._t("status_" + status));
         const btypeText = btype && btype !== "unavailable" && btype !== "\u2013" ? btype : "";
         const sCount = populatedCells.length;
-        const btypePill = btypeText && sCount > 0 ? `<span class="btype-label">${btypeText} \xb7 ${sCount}S</span>` : btypeText ? `<span class="btype-label">${btypeText}</span>` : "";
+        const btypePill = btypeText && sCount > 0 ? `<span class="btype-label">${(0, $b724747388f32094$export$a1a11b095f88289a)(btypeText)} \xb7 ${sCount}S</span>` : btypeText ? `<span class="btype-label">${(0, $b724747388f32094$export$a1a11b095f88289a)(btypeText)}</span>` : "";
         const accent = color ? color.fill : null;
         const fillStyle = `width:${fillW}%${color ? `;background:linear-gradient(90deg,${color.deep},${color.fill})` : ""}`;
         const bodyStyle = color ? `border-color:${color.glow};box-shadow:0 0 16px ${color.shadow}` : "";
@@ -597,7 +688,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         </div>`;
         else info = `
         <div class="pack-info">
-          <span class="status-badge ${status}" data-entity="${e?.status || ""}" ${badgeStyle}>${statusLabel}</span>
+          <span class="status-badge ${(0, $b724747388f32094$export$a1a11b095f88289a)(status)}" data-entity="${e?.status || ""}" ${badgeStyle}>${statusLabel}</span>
           <div class="pack-pct" data-entity="${e?.capacity || ""}">
             <span class="pct-num">${Math.round(pct)}</span><span class="pct-sym">%</span>
             ${isCharging ? `<ha-icon icon="mdi:lightning-bolt" class="pack-bolt" style="color:${accent || 'var(--isdt-charging)'}"></ha-icon>` : ""}
@@ -605,7 +696,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
           ${btypePill}
         </div>`;
         return `
-      <div class="pack-slot ${status}" data-slot="${slot}">
+      <div class="pack-slot ${(0, $b724747388f32094$export$a1a11b095f88289a)(status)}" data-slot="${slot}">
         <div class="pack-shell">
           <div class="pack-body" ${bodyStyle ? `style="${bodyStyle}"` : ""}>
             <div class="pack-fill" style="${fillStyle}"></div>
@@ -620,12 +711,12 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         </div>
         <div class="pack-stats ${isEmpty ? "hidden" : ""}">
           <div class="slot-vi">
-            <span data-entity="${e?.output_voltage || ""}"><ha-icon icon="mdi:flash"></ha-icon>${vol.toFixed(2)} V</span>
-            <span data-entity="${e?.charging_current || ""}"><ha-icon icon="mdi:current-dc"></ha-icon>${cur.toFixed(3)} A</span>
+            <span data-entity="${e?.output_voltage || ""}"><ha-icon icon="mdi:flash"></ha-icon>${this._fmt(vol, 2)} V</span>
+            <span data-entity="${e?.charging_current || ""}"><ha-icon icon="mdi:current-dc"></ha-icon>${this._fmt(cur, 3)} A</span>
           </div>
           ${status === "charging" || status === "done" ? `
             <div class="slot-session">
-              <span class="time-val" data-entity="${e?.charge_time || ""}" ${isCharging ? `data-since="${since || ""}"` : ""}><ha-icon icon="mdi:timer-outline"></ha-icon>${timeStr}</span>
+              <span class="time-val" data-entity="${e?.charge_time || ""}" ${isCharging ? `data-since="${(0, $b724747388f32094$export$a1a11b095f88289a)(since)}"` : ""}><ha-icon icon="mdi:timer-outline"></ha-icon>${timeStr}</span>
               <span class="session-energy">${this._sessionText(e)}</span>
             </div>` : ""}
         </div>
@@ -685,11 +776,11 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         const iV = this._num(main.input_voltage);
         const iA = this._num(main.input_current);
         const tA = this._num(main.total_charging_current);
-        const iW = (iV * iA).toFixed(1);
-        this._setField(root, "input-v", `${iV.toFixed(1)}<small>V</small>`);
-        this._setField(root, "input-a", `${iA.toFixed(2)}<small>A</small>`);
+        const iW = this._fmt(iV * iA, 1);
+        this._setField(root, "input-v", `${this._fmt(iV, 1)}<small>V</small>`);
+        this._setField(root, "input-a", `${this._fmt(iA, 2)}<small>A</small>`);
         this._setField(root, "input-w", `${iW}<small>W</small>`);
-        this._setField(root, "total-a", `${tA.toFixed(2)}<small>A</small>`);
+        this._setField(root, "total-a", `${this._fmt(tA, 2)}<small>A</small>`);
         const connected = this._st(main.connected, "off") === "on";
         const connIcon = root.querySelector(".conn-icon");
         if (connIcon) {
@@ -748,10 +839,10 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
                 if (isNaN(v)) return;
                 voltages.push(v);
                 const vEl = el.querySelector(".cell-v");
-                if (vEl) vEl.innerHTML = `${v.toFixed(2)}<small>V</small>`;
+                if (vEl) vEl.innerHTML = `${this._fmt(v, 2)}<small>V</small>`;
                 const irAttr = st?.attributes?.ir_mohm;
                 const irEl = el.querySelector(".cell-ir");
-                if (irEl && typeof irAttr === "number") irEl.innerHTML = `${irAttr.toFixed(1)}<small> m\u{3A9}</small>`;
+                if (irEl && typeof irAttr === "number") irEl.innerHTML = `${this._fmt(irAttr, 1)}<small> m\u{3A9}</small>`;
             });
             // Refresh drift highlighting against the new median.
             if (voltages.length > 1) {
@@ -769,11 +860,11 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             if (vi.length >= 2) for (const [i, text] of [
                 [
                     0,
-                    `${vol.toFixed(2)} V`
+                    `${this._fmt(vol, 2)} V`
                 ],
                 [
                     1,
-                    `${cur.toFixed(3)} A`
+                    `${this._fmt(cur, 3)} A`
                 ]
             ]){
                 const icon = vi[i].querySelector("ha-icon");
@@ -793,11 +884,11 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         const iV = this._num(main.input_voltage);
         const iA = this._num(main.input_current);
         const tA = this._num(main.total_charging_current);
-        const iW = (iV * iA).toFixed(1);
-        this._setField(root, "input-v", `${iV.toFixed(1)}<small>V</small>`);
-        this._setField(root, "input-a", `${iA.toFixed(2)}<small>A</small>`);
+        const iW = this._fmt(iV * iA, 1);
+        this._setField(root, "input-v", `${this._fmt(iV, 1)}<small>V</small>`);
+        this._setField(root, "input-a", `${this._fmt(iA, 2)}<small>A</small>`);
         this._setField(root, "input-w", `${iW}<small>W</small>`);
-        this._setField(root, "total-a", `${tA.toFixed(2)}<small>A</small>`);
+        this._setField(root, "total-a", `${this._fmt(tA, 2)}<small>A</small>`);
         // Update connection icon
         const connected = this._st(main.connected, "off") === "on";
         const connIcon = root.querySelector(".conn-icon");
@@ -860,11 +951,11 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             if (vi.length >= 2) for (const [i, text] of [
                 [
                     0,
-                    `${vol.toFixed(2)} V`
+                    `${this._fmt(vol, 2)} V`
                 ],
                 [
                     1,
-                    `${cur.toFixed(3)} A`
+                    `${this._fmt(cur, 3)} A`
                 ]
             ]){
                 const icon = vi[i].querySelector("ha-icon");
@@ -987,8 +1078,8 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
       <div class="header adapter-header">
         <div class="header-top">
           <div class="header-title">
-            ${customTitle ? `<span class="title-text">${customTitle}</span>` : `<span class="isdt-logo">ISDT</span>`}
-            ${showModel && model ? `<span class="model-name">${model}</span>` : ""}
+            ${customTitle ? `<span class="title-text">${(0, $b724747388f32094$export$a1a11b095f88289a)(customTitle)}</span>` : `<span class="isdt-logo">ISDT</span>`}
+            ${showModel && model ? `<span class="model-name">${(0, $b724747388f32094$export$a1a11b095f88289a)(model)}</span>` : ""}
           </div>
           <div class="header-icons">
             <svg class="conn-icon ${connected ? "" : "disconnected"}" viewBox="0 0 24 24" fill="currentColor" stroke="none"
@@ -1000,7 +1091,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
               <button class="sound-btn ${soundState !== "mute" ? "on" : ""}"
                       data-beep="${main.beep || ""}"
                       data-volume="${main.volume || ""}"
-                      title="${this._t("sound_" + soundState)}">
+                      title="${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sound_" + soundState))}">
                 <ha-icon class="sound-btn-icon" icon="${soundIcon}"></ha-icon>
               </button>
               <div class="sound-popover">${popoverOpts}</div>
@@ -1019,7 +1110,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
               <circle class="fg-ring" cx="42" cy="42" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${dashOffset}"/>
             </svg>
             <div class="gauge-center">
-              <span class="gauge-watts" data-field="total-w">${totalW.toFixed(0)}<small>W</small></span>
+              <span class="gauge-watts" data-field="total-w">${this._fmt(totalW, 0)}<small>W</small></span>
               ${totalMax ? `<span class="gauge-unit">${this._t("gauge_of")} ${totalMax}W</span>` : ""}
             </div>
           </div>
@@ -1030,7 +1121,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             </div>
             <div class="power-row">
               <span class="lbl">${this._t("load")}</span>
-              <span class="val" data-field="load-pct">${totalMax ? `${pct.toFixed(0)} %` : "\u2013"}</span>
+              <span class="val" data-field="load-pct">${totalMax ? `${this._fmt(pct, 0)} %` : "\u2013"}</span>
             </div>
             <div class="power-bar"><div class="power-bar-fill" data-field="load-bar" style="width:${pct}%"></div></div>
           </div>
@@ -1068,14 +1159,14 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         <div class="port-head">
           <div class="port-num">
             <ha-icon class="port-icon" icon="${iconName}"></ha-icon>
-            <span>${port?.label || ""}</span>
+            <span>${(0, $b724747388f32094$export$a1a11b095f88289a)(port?.label)}</span>
           </div>
           ${badgeHTML}
         </div>
-        <div class="port-watts" data-entity="${port?.power || ""}">${w.toFixed(1)}<small>W</small></div>
+        <div class="port-watts" data-entity="${port?.power || ""}">${this._fmt(w, 1)}<small>W</small></div>
         <div class="port-vi">
-          <span data-entity="${port?.voltage || ""}">${v.toFixed(2)} V</span>
-          <span data-entity="${port?.current || ""}">${a.toFixed(2)} A</span>
+          <span data-entity="${port?.voltage || ""}">${this._fmt(v, 2)} V</span>
+          <span data-entity="${port?.current || ""}">${this._fmt(a, 2)} A</span>
         </div>
         <div class="port-bar"><div class="port-bar-fill" style="width:${barPct}%"></div></div>
       </div>`;
@@ -1090,8 +1181,8 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         const pct = totalMax ? Math.min(100, totalW / totalMax * 100) : 0;
         const R = 36;
         const C = 2 * Math.PI * R;
-        this._setField(root, "total-w", `${totalW.toFixed(0)}<small>W</small>`);
-        this._setField(root, "load-pct", totalMax ? `${pct.toFixed(0)} %` : "\u2013");
+        this._setField(root, "total-w", `${this._fmt(totalW, 0)}<small>W</small>`);
+        this._setField(root, "load-pct", totalMax ? `${this._fmt(pct, 0)} %` : "\u2013");
         const loadBar = root.querySelector('[data-field="load-bar"]');
         if (loadBar) loadBar.style.width = `${pct}%`;
         const fg = root.querySelector(".fg-ring");
@@ -1131,11 +1222,11 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             const v = this._num(port?.voltage, 0);
             const a = this._num(port?.current, 0);
             const wEl = portEl.querySelector(".port-watts");
-            if (wEl) wEl.innerHTML = `${w.toFixed(1)}<small>W</small>`;
+            if (wEl) wEl.innerHTML = `${this._fmt(w, 1)}<small>W</small>`;
             const viSpans = portEl.querySelectorAll(".port-vi span");
             if (viSpans.length >= 2) {
-                viSpans[0].textContent = `${v.toFixed(2)} V`;
-                viSpans[1].textContent = `${a.toFixed(2)} A`;
+                viSpans[0].textContent = `${this._fmt(v, 2)} V`;
+                viSpans[1].textContent = `${this._fmt(a, 2)} A`;
             }
             // Protocol badge only exists for USB-C ports (see _portHTML).
             const badgeEl = portEl.querySelector(".proto-badge");
@@ -1172,15 +1263,15 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         const iV = this._num(main.input_voltage);
         const iA = this._num(main.input_current);
         const tA = this._num(main.total_charging_current);
-        const iW = (iV * iA).toFixed(1);
+        const iW = this._fmt(iV * iA, 1);
         const beep = this._st(main.beep, "off") === "on";
         const connected = this._st(main.connected, "off") === "on";
         return `
       <div class="header">
         <div class="header-top">
           <div class="header-title">
-            ${customTitle ? `<span class="title-text">${customTitle}</span>` : `<span class="isdt-logo">ISDT</span>`}
-            ${showModel && model ? `<span class="model-name">${model}</span>` : ""}
+            ${customTitle ? `<span class="title-text">${(0, $b724747388f32094$export$a1a11b095f88289a)(customTitle)}</span>` : `<span class="isdt-logo">ISDT</span>`}
+            ${showModel && model ? `<span class="model-name">${(0, $b724747388f32094$export$a1a11b095f88289a)(model)}</span>` : ""}
           </div>
           <div class="header-icons">
             <svg class="conn-icon ${connected ? "" : "disconnected"}" viewBox="0 0 24 24" fill="currentColor" stroke="none"
@@ -1199,13 +1290,13 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
           </div>
         </div>
         <div class="header-stats">
-          <div class="stat"><span class="stat-value" data-field="input-v">${iV.toFixed(1)}<small>V</small></span><span class="stat-label">${this._t("header_input")}</span></div>
+          <div class="stat"><span class="stat-value" data-field="input-v">${this._fmt(iV, 1)}<small>V</small></span><span class="stat-label">${this._t("header_input")}</span></div>
           <div class="stat-div"></div>
-          <div class="stat"><span class="stat-value" data-field="input-a">${iA.toFixed(2)}<small>A</small></span><span class="stat-label">${this._t("header_current")}</span></div>
+          <div class="stat"><span class="stat-value" data-field="input-a">${this._fmt(iA, 2)}<small>A</small></span><span class="stat-label">${this._t("header_current")}</span></div>
           <div class="stat-div"></div>
           <div class="stat"><span class="stat-value" data-field="input-w">${iW}<small>W</small></span><span class="stat-label">${this._t("header_power")}</span></div>
           <div class="stat-div"></div>
-          <div class="stat"><span class="stat-value" data-field="total-a">${tA.toFixed(2)}<small>A</small></span><span class="stat-label">${this._t("header_total_charge")}</span></div>
+          <div class="stat"><span class="stat-value" data-field="total-a">${this._fmt(tA, 2)}<small>A</small></span><span class="stat-label">${this._t("header_total_charge")}</span></div>
         </div>
       </div>`;
     }
@@ -1288,11 +1379,11 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         <div class="battery-pct">
           <span class="pct-num" ${pctStyle}>${Math.round(pct)}</span><span class="pct-sym" ${symStyle}>%</span>${isCharging ? `<ha-icon icon="mdi:lightning-bolt" class="charging-bolt" ${boltStyle}></ha-icon>` : ""}
         </div>`;
-            if (btypeLabel) center += `<span class="btype-label" data-entity="${e?.battery_type || ""}">${btypeLabel}</span>`;
+            if (btypeLabel) center += `<span class="btype-label" data-entity="${e?.battery_type || ""}">${(0, $b724747388f32094$export$a1a11b095f88289a)(btypeLabel)}</span>`;
         }
         const badgeStyle = accentColor ? `style="color:${accentColor}"` : "";
         return `
-      <div class="battery-slot ${status}" data-slot="${slot}">
+      <div class="battery-slot ${(0, $b724747388f32094$export$a1a11b095f88289a)(status)}" data-slot="${slot}">
         <div class="battery-shell">
           <div class="battery-body" data-entity="${e?.capacity || ""}" ${bodyStyle ? `style="${bodyStyle}"` : ""}>
             <div class="battery-fill" style="${fillStyle}">
@@ -1301,7 +1392,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             </div>
             <div class="battery-content">
               <span class="slot-badge">${slot}</span>
-              <span class="status-badge ${status}" data-entity="${e?.status || ""}" ${badgeStyle}>${this._t("status_" + status)}</span>
+              <span class="status-badge ${(0, $b724747388f32094$export$a1a11b095f88289a)(status)}" data-entity="${e?.status || ""}" ${badgeStyle}>${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("status_" + status))}</span>
               ${center}
             </div>
           </div>
@@ -1309,12 +1400,12 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         </div>
         <div class="battery-info ${isEmpty ? "hidden" : ""}">
           <div class="slot-vi">
-            <span data-entity="${e?.output_voltage || ""}"><ha-icon icon="mdi:flash"></ha-icon>${vol.toFixed(2)} V</span>
-            <span data-entity="${e?.charging_current || ""}"><ha-icon icon="mdi:current-dc"></ha-icon>${cur.toFixed(3)} A</span>
+            <span data-entity="${e?.output_voltage || ""}"><ha-icon icon="mdi:flash"></ha-icon>${this._fmt(vol, 2)} V</span>
+            <span data-entity="${e?.charging_current || ""}"><ha-icon icon="mdi:current-dc"></ha-icon>${this._fmt(cur, 3)} A</span>
           </div>
           ${isActive ? `
             <div class="slot-session">
-              <span class="time-val" data-entity="${e?.charge_time || ""}" ${isCharging ? `data-since="${since || ""}"` : ""}><ha-icon icon="mdi:timer-outline"></ha-icon>${timeStr}</span>
+              <span class="time-val" data-entity="${e?.charge_time || ""}" ${isCharging ? `data-since="${(0, $b724747388f32094$export$a1a11b095f88289a)(since)}"` : ""}><ha-icon icon="mdi:timer-outline"></ha-icon>${timeStr}</span>
               <span class="session-energy">${this._sessionText(e)}</span>
             </div>` : ""}
         </div>
@@ -2068,6 +2159,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
  * red, every active warning gets its own icon. Packs that are out of range
  * stay in the list with the time they were last heard.
  */ 
+
 const $309cd1a055a0ccab$export$8b990d5e24cdbf9 = "isdt-battair-card";
 const $309cd1a055a0ccab$var$PREFIX = "battair_";
 const $309cd1a055a0ccab$var$SORTS = [
@@ -2079,13 +2171,6 @@ const $309cd1a055a0ccab$var$SORTS = [
 // in the unit set in Home Assistant, so °F is converted before comparing.
 const $309cd1a055a0ccab$var$TEMP_LOW = 5;
 const $309cd1a055a0ccab$var$TEMP_HIGH = 45;
-const $309cd1a055a0ccab$var$esc = (s)=>String(s ?? "").replace(/[&<>"']/g, (c)=>({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#39;"
-        })[c]);
 const $309cd1a055a0ccab$var$BAD = new Set([
     "unavailable",
     "unknown",
@@ -2112,38 +2197,44 @@ class $309cd1a055a0ccab$export$dad56d593e92344c extends HTMLElement {
         return {};
     }
     static getConfigForm() {
+        // The editor gets no hass here: read the user's language from the
+        // Home Assistant root element so the labels follow it.
+        const labels = {
+            title: "battair_config_title",
+            sort: "battair_config_sort",
+            hide_unavailable: "battair_config_hide_unavailable",
+            show_cycles: "battair_config_show_cycles"
+        };
+        const h = (0, $b724747388f32094$export$9fb280befa7ef4fc)();
         return {
+            computeLabel: (schema)=>labels[schema.name] ? (0, $d8078e452c66bdbe$export$625550452a3fa3ec)((0, $b724747388f32094$export$9fb280befa7ef4fc)(), labels[schema.name]) : undefined,
             schema: [
                 {
                     name: "title",
-                    label: (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(null, "battair_config_title"),
                     selector: {
                         text: {}
                     }
                 },
                 {
                     name: "sort",
-                    label: (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(null, "battair_config_sort"),
                     selector: {
                         select: {
                             mode: "dropdown",
                             options: $309cd1a055a0ccab$var$SORTS.map((value)=>({
                                     value: value,
-                                    label: (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(null, `battair_sort_${value}`)
+                                    label: (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(h, `battair_sort_${value}`)
                                 }))
                         }
                     }
                 },
                 {
                     name: "hide_unavailable",
-                    label: (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(null, "battair_config_hide_unavailable"),
                     selector: {
                         boolean: {}
                     }
                 },
                 {
                     name: "show_cycles",
-                    label: (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(null, "battair_config_show_cycles"),
                     selector: {
                         boolean: {}
                     }
@@ -2288,14 +2379,11 @@ class $309cd1a055a0ccab$export$dad56d593e92344c extends HTMLElement {
         return this._warnings(p).some((w)=>w.cls === "error");
     }
     /* ── Formatting ─────────────────────────────────────── */ _lang() {
-        return this._hass?.locale?.language || this._hass?.language || "en";
+        return (0, $b724747388f32094$export$ae08705376f8038d)(this._hass);
     }
     _fmt(value, digits) {
         if (value == null) return "\u2014";
-        return value.toLocaleString(this._lang(), {
-            minimumFractionDigits: digits,
-            maximumFractionDigits: digits
-        });
+        return (0, $b724747388f32094$export$f5dd818bff069720)(this._hass, value, digits);
     }
     _ago(date) {
         if (!date || isNaN(+date)) return (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(this._hass, "battair_never_seen");
@@ -2348,6 +2436,7 @@ class $309cd1a055a0ccab$export$dad56d593e92344c extends HTMLElement {
         const key = JSON.stringify([
             this._config,
             this._lang(),
+            this._hass.locale?.number_format,
             total,
             packs
         ]);
@@ -2365,7 +2454,7 @@ class $309cd1a055a0ccab$export$dad56d593e92344c extends HTMLElement {
             stat(warnings, "", (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(h, "battair_stat_warnings"), warnings ? "warn" : ""),
             stat(away, "", (0, $d8078e452c66bdbe$export$625550452a3fa3ec)(h, "battair_stat_away"))
         ].join('<div class="stat-div"></div>');
-        const title = this._config.title ? `<span class="title-text">${$309cd1a055a0ccab$var$esc(this._config.title)}</span>` : `<span class="isdt-logo">ISDT</span><span class="model-name">BattAir</span>`;
+        const title = this._config.title ? `<span class="title-text">${(0, $b724747388f32094$export$a1a11b095f88289a)(this._config.title)}</span>` : `<span class="isdt-logo">ISDT</span><span class="model-name">BattAir</span>`;
         const rows = packs.length ? packs.map((p)=>this._row(p)).join("") : `<div class="empty">${(0, $d8078e452c66bdbe$export$625550452a3fa3ec)(h, total ? "battair_all_hidden" : "battair_empty")}</div>`;
         this.shadowRoot.innerHTML = `
       <style>${this._css()}</style>
@@ -2398,22 +2487,22 @@ class $309cd1a055a0ccab$export$dad56d593e92344c extends HTMLElement {
         const color = p.available ? this._color(p.charge) : null;
         const pct = color ? Math.max(3, Math.min(100, p.charge)) : 0;
         let sub;
-        if (!p.available) sub = `<div class="sub" data-entity="${p.ids.last_seen || ""}">${(0, $d8078e452c66bdbe$export$625550452a3fa3ec)(h, "battair_last_seen")} ${$309cd1a055a0ccab$var$esc(this._ago(p.lastSeen))}</div>`;
-        else if (errors.length) sub = `<div class="sub err" data-entity="${errors[0].entity || ""}">${$309cd1a055a0ccab$var$esc(errors.map((w)=>w.text).join(" \xb7 "))}</div>`;
+        if (!p.available) sub = `<div class="sub" data-entity="${p.ids.last_seen || ""}">${(0, $d8078e452c66bdbe$export$625550452a3fa3ec)(h, "battair_last_seen")} ${(0, $b724747388f32094$export$a1a11b095f88289a)(this._ago(p.lastSeen))}</div>`;
+        else if (errors.length) sub = `<div class="sub err" data-entity="${errors[0].entity || ""}">${(0, $b724747388f32094$export$a1a11b095f88289a)(errors.map((w)=>w.text).join(" \xb7 "))}</div>`;
         else {
             const spec = [];
             if (p.cells != null) spec.push(`${p.cells}S`);
-            if (p.capacity != null) spec.push(`${Math.round(p.capacity)} mAh`);
+            if (p.capacity != null) spec.push(`${this._fmt(p.capacity, 0)} mAh`);
             if (p.cell != null) spec.push(`\xd8 ${this._fmt(p.cell, 2)} V`);
             if (this._config.show_cycles && p.cycles != null) spec.push(`${this._fmt(p.cycles, 0)} ${(0, $d8078e452c66bdbe$export$625550452a3fa3ec)(h, p.cycles === 1 ? "battair_cycle" : "battair_cycles")}`);
-            sub = `<div class="sub" data-entity="${p.ids.cell_voltage_avg || ""}">${$309cd1a055a0ccab$var$esc(spec.join(" \xb7 "))}</div>`;
+            sub = `<div class="sub" data-entity="${p.ids.cell_voltage_avg || ""}">${(0, $b724747388f32094$export$a1a11b095f88289a)(spec.join(" \xb7 "))}</div>`;
         }
-        const icons = p.available ? warn.map((w)=>`<ha-icon class="${w.cls}" icon="${w.icon}" title="${$309cd1a055a0ccab$var$esc(w.text)}" data-entity="${w.entity || ""}"></ha-icon>`).join("") : `<ha-icon class="muted" icon="mdi:bluetooth-off" title="${$309cd1a055a0ccab$var$esc((0, $d8078e452c66bdbe$export$625550452a3fa3ec)(h, "battair_stat_away"))}" data-entity="${p.ids.last_seen || ""}"></ha-icon>`;
+        const icons = p.available ? warn.map((w)=>`<ha-icon class="${w.cls}" icon="${w.icon}" title="${(0, $b724747388f32094$export$a1a11b095f88289a)(w.text)}" data-entity="${w.entity || ""}"></ha-icon>`).join("") : `<ha-icon class="muted" icon="mdi:bluetooth-off" title="${(0, $b724747388f32094$export$a1a11b095f88289a)((0, $d8078e452c66bdbe$export$625550452a3fa3ec)(h, "battair_stat_away"))}" data-entity="${p.ids.last_seen || ""}"></ha-icon>`;
         const pctHTML = p.available && p.charge != null ? `${Math.round(p.charge)}<small>%</small>` : `<span class="dash">\u{2013}</span>`;
         return `
       <div class="line ${p.available ? "" : "off"} ${errors.length ? "problem" : ""}">
         <div class="who">
-          <div class="name" title="${$309cd1a055a0ccab$var$esc(p.name)}" data-entity="${p.ids.battery || ""}">${$309cd1a055a0ccab$var$esc(p.label)}</div>
+          <div class="name" title="${(0, $b724747388f32094$export$a1a11b095f88289a)(p.name)}" data-entity="${p.ids.battery || ""}">${(0, $b724747388f32094$export$a1a11b095f88289a)(p.label)}</div>
           ${sub}
         </div>
         <div class="bar" data-entity="${p.ids.battery || ""}"><div class="bar-fill" style="width:${pct}%;${color ? `background:${color.fill}` : ""}"></div></div>
