@@ -6,7 +6,7 @@
 
 Custom Home Assistant integration for **ISDT chargers** and the **MASS2** USB power adapter with Bluetooth Low Energy (BLE) connectivity. Communicates directly with the device via a persistent BLE connection — no cloud, no app required.
 
-Supports the **C4 Air** (6-channel charger), **A8 Air** (8-channel charger), **Air 8**, **K2 Air** and **K4** (LiPo balance chargers), and **MASS2** (8-port USB adapter). **BattAir** smart packs and plugins are read from their Bluetooth broadcasts, without a connection (beta).
+Supports round-cell chargers (**C4 Air**, **A8 Air**), the **NP2 Air** camera battery charger, LiPo balance chargers (**Air 8**, **K2 Air**, **K4**) and the USB power adapters **MASS2** and **Power 200 / 200H / 200X**. **BattAir** smart packs and plugins are read from their Bluetooth broadcasts, without a connection (beta).
 
 <a href="images/device_overview.png"><img src="images/device_overview.png" alt="Device Overview" width="880"></a>
 
@@ -88,7 +88,7 @@ show_cycles: false
 | **Smart battery packs** | | |
 | BattAir packs and BattAir Plugin (BAP2/4/6) | :white_check_mark: (beta) | Community ([#15](https://github.com/mtheli/isdt_air_ble/issues/15), captures) |
 
-Other BLE-enabled ISDT devices using the same protocol may also work. The integration auto-detects the model from the Bluetooth advertisement and creates one sub-device per slot or port (6 for the C4 Air, 8 for the A8 Air, 2 for the NP2 Air, 1 pack with per-cell voltages for the Air 8, 2 for the K2 Air and K4, 8 USB ports for the MASS2), with only the entities the model supports. If your model works, please [let me know](https://github.com/mtheli/isdt_air_ble/issues) so I can add it to the list!
+Other BLE-enabled ISDT devices using the same protocol may also work. The integration auto-detects the model from the Bluetooth advertisement and creates one sub-device per slot or port (6 for the C4 Air, 8 for the A8 Air, 2 for the NP2 Air, 1 pack with per-cell voltages for the Air 8, 2 for the K2 Air and K4, 8 USB ports for the MASS2, the wireless pad and 4 USB ports for the Power 200), with only the entities the model supports. If your model works, please [let me know](https://github.com/mtheli/isdt_air_ble/issues) so I can add it to the list!
 
 ---
 
