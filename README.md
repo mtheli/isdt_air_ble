@@ -291,6 +291,8 @@ For a detailed technical description of the BLE protocol including packet format
 ## Related Projects
 
 - [ISDT Charge Utility](https://github.com/DittelHome/ISDT-Charge-Utility) by @DittelHome – standalone Windows/Linux app to monitor and control ISDT Air chargers (C4 Air, A4 Air, A8 Air), including setting charge parameters. Its [PROTOCOL.md](https://github.com/DittelHome/ISDT-Charge-Utility/blob/main/PROTOCOL.md) also documents the write commands.
+- [hass_isdt](https://github.com/pallemannen/hass_isdt) by [@pallemannen](https://github.com/pallemannen) – Home Assistant integration for ISDT chargers connected over USB (N8, N16, N24).
+- [battbench](https://github.com/fashberg/battbench) by [@fashberg](https://github.com/fashberg) – battery test bench for ISDT and SkyRC chargers that tracks each rechargeable cell over its lifetime.
 
 ## Disclaimer
 
