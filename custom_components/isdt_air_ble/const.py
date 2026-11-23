@@ -280,7 +280,7 @@ MODEL_CHANNEL_COUNT_MAP: dict[str, int] = {
     "A4 Air": 4,
     "K2 Air": 2,  # Two balance channels
     "K4": 2,      # Two balance channels
-    "Air 8": 1,   # Single LiPo pack port (up to 6 cells on one channel)
+    "Air 8": 1,   # Single LiPo pack port (up to 8 cells on one channel)
     "NP2 Air": 2,
     "LP2 Air": 2,
     # Default for most chargers is 6 channels
