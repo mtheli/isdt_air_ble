@@ -688,16 +688,22 @@ def _parse_mass2_work_status(data: bytes, parsed: dict) -> bool:
 def _parse_mass2_settings(data: bytes) -> dict | None:
     """Parse MASS2 SettingsResp (CMD 0xCB).
 
-    Format (verified against MASS2Settings.initData):
+    Format:
       Byte 0: 0x31 frame header
       Byte 1: 0xCB cmd word
       Byte 2: scheduledMute (uint8) — beep mode (0=mute, !=0=beep)
       Byte 3: volume (uint8) — 0=low, 1=medium, 2=high
-      Byte 4: operationSoundRepeatDay (uint8) — bit 7 = mute timer enabled
-      Byte 5-6: openingTime (uint16 LE) — mute timer start, in minutes
-      Byte 7-8: closingTime (uint16 LE) — mute timer end, in minutes
-      Bytes 9-20: 4 × AlarmClock (3 bytes each)
+      Byte 4: operationSoundRepeatDay (uint8) — mute timer: bit 7 = enabled,
+              bits 0-6 = weekdays (bit 0 = Monday … bit 6 = Sunday)
+      Byte 5-6: openingTime — mute timer start
+      Byte 7-8: closingTime — mute timer end
+      Bytes 9-20: 4 × AlarmClock (3 bytes each): switchRepeatDay (same
+              bit layout as byte 4), openingTime (time as below)
     Total: 21 bytes
+
+    Times are two bytes [hour (0-23), minute]. Read as uint16 LE (as this
+    parser does) that is ``hour | minute << 8``: 09:00 is 9, 09:30 is
+    0x1E09. If opening >= closing the window runs past midnight.
     """
     if len(data) < 21:
         _LOGGER.warning(
