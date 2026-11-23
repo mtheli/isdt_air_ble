@@ -1002,7 +1002,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         const p = this._num(port?.power, 0);
         return p > 0.05 ? "active" : "off";
     }
-    _protoBadge(port) {
+    _protoBadge(port, state) {
         const proto = this._st(port?.protocol, "none");
         if (proto === "pd") return {
             label: "PD",
@@ -1012,9 +1012,15 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             label: "FAST",
             cls: "fast"
         };
-        return {
+        // No fast-charge protocol: "OFF" only fits a port that is off. A
+        // port delivering plain 5 V gets no badge, like the USB-A ports.
+        if (state === "off") return {
             label: "OFF",
             cls: "off"
+        };
+        return {
+            label: "",
+            cls: "none"
         };
     }
     _adapterHTML() {
@@ -1151,7 +1157,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         // there's nothing meaningful to show).
         let badgeHTML = "";
         if (kind === "C") {
-            const badge = this._protoBadge(port);
+            const badge = this._protoBadge(port, state);
             badgeHTML = `<span class="proto-badge proto-${badge.cls}" data-entity="${port?.protocol || ""}">${badge.label}</span>`;
         }
         return `
@@ -1231,7 +1237,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             // Protocol badge only exists for USB-C ports (see _portHTML).
             const badgeEl = portEl.querySelector(".proto-badge");
             if (badgeEl) {
-                const badge = this._protoBadge(port);
+                const badge = this._protoBadge(port, state);
                 badgeEl.className = `proto-badge proto-${badge.cls}`;
                 badgeEl.textContent = badge.label;
             }
@@ -1951,6 +1957,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
     .proto-pd   { background: rgba(255,152,0,0.15);  color: #ff9800; }
     .proto-fast { background: rgba(171,71,188,0.15); color: #ab47bc; }
     .proto-off  { background: transparent;           color: var(--disabled-text-color); }
+    .proto-none { display: none; }
 
     .port-watts {
       font-family: ui-monospace, 'Roboto Mono', monospace;
