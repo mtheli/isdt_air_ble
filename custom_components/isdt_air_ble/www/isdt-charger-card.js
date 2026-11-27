@@ -185,7 +185,7 @@ function $6770c3493bdef5a7$export$c042bcc40faacfc(tr, s) {
 
 
 // Written by the release sync script (isdt_air_ble scripts/sync_card.sh).
-const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.15.1";
+const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.16.0";
 const $8ee5ce714273e53b$export$9b657414b7dffe40 = "bundled";
 
 
