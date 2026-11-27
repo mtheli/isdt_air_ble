@@ -170,12 +170,18 @@ function $6770c3493bdef5a7$export$c042bcc40faacfc(tr, s) {
     </div>
     <div class="sched-row${off}">
       <span class="sched-lab">${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.times)}</span>
-      <span class="sched-tl">${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.a)}</span>
-      <input class="sched-time" type="time" data-sched="${s.key}" data-act="start"
-        value="${(0, $b724747388f32094$export$a1a11b095f88289a)(s.start)}" aria-label="${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.a)}">
-      <span class="sched-tl">${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.b)}</span>
-      <input class="sched-time" type="time" data-sched="${s.key}" data-act="end"
-        value="${(0, $b724747388f32094$export$a1a11b095f88289a)(s.end)}" aria-label="${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.b)}">
+      <span class="sched-pairs">
+      <span class="sched-pair">
+        <span class="sched-tl">${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.a)}</span>
+        <input class="sched-time" type="time" data-sched="${s.key}" data-act="start"
+          value="${(0, $b724747388f32094$export$a1a11b095f88289a)(s.start)}" aria-label="${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.a)}">
+      </span>
+      <span class="sched-pair">
+        <span class="sched-tl">${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.b)}</span>
+        <input class="sched-time" type="time" data-sched="${s.key}" data-act="end"
+          value="${(0, $b724747388f32094$export$a1a11b095f88289a)(s.end)}" aria-label="${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.b)}">
+      </span>
+      </span>
     </div>
     <div class="sched-row${off}">
       <span class="sched-lab">${(0, $b724747388f32094$export$a1a11b095f88289a)(tr('sched_days'))}</span>
@@ -185,7 +191,7 @@ function $6770c3493bdef5a7$export$c042bcc40faacfc(tr, s) {
 
 
 // Written by the release sync script (isdt_air_ble scripts/sync_card.sh).
-const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.16.0";
+const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.16.1";
 const $8ee5ce714273e53b$export$9b657414b7dffe40 = "bundled";
 
 
@@ -1398,6 +1404,8 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         const n = this._schedPort;
         const port = n ? this._entities.ports[n] : null;
         if (!n || !this._schedSupported(port)) {
+            const card = root.querySelector(".adapter-card");
+            if (card) card.style.paddingBottom = "";
             pop.hidden = true;
             pop.innerHTML = "";
             this._schedPopHtml = null;
@@ -1414,9 +1422,11 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
           <ha-icon icon="mdi:clock-outline"></ha-icon>${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sched_force_off"))}</button>
         <span class="sched-hint">${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sched_back_hint"))}</span>`;
         const html = `
-      <div class="sched-title">
-        <span class="sched-name">${(0, $b724747388f32094$export$a1a11b095f88289a)(port.label)} \xb7 ${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sched_output"))}</span>
-        ${this._schedChip(st, sc)}
+      <div class="sched-head">
+        <div class="sched-title">
+          <span class="sched-name">${(0, $b724747388f32094$export$a1a11b095f88289a)(port.label)} \xb7 ${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sched_output"))}</span>
+          ${this._schedChip(st, sc)}
+        </div>
         <button class="sched-close" data-act="close" title="${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sched_close"))}"
           aria-label="${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sched_close"))}"><ha-icon icon="mdi:close"></ha-icon></button>
       </div>
@@ -1451,11 +1461,28 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         const c = card.getBoundingClientRect();
         const t = tile.getBoundingClientRect();
         const w = pop.offsetWidth;
+        const h = pop.offsetHeight;
         const centre = t.left - c.left + t.width / 2;
         const left = Math.max(12, Math.min(c.width - w - 12, centre - w / 2));
         pop.style.left = `${left}px`;
-        pop.style.top = `${t.bottom - c.top + 10}px`;
         pop.style.setProperty("--caret", `${centre - left}px`);
+        // The card clips its content (ha-card overflow: hidden), so the popup
+        // must stay inside it: below the tile if it fits, else above, else
+        // grow the card at the bottom until it fits below.
+        const gap = 10, margin = 12;
+        const below = t.bottom - c.top + gap;
+        const height = c.height - (parseFloat(card.style.paddingBottom) || 0);
+        const above = t.top - c.top - gap - h;
+        let top = below, up = false, pad = 0;
+        if (below + h + margin > height) {
+            if (above >= margin) {
+                top = above;
+                up = true;
+            } else pad = below + h + margin - height;
+        }
+        pop.classList.toggle("up", up);
+        pop.style.top = `${top}px`;
+        card.style.paddingBottom = pad > 0 ? `${Math.ceil(pad)}px` : "";
     }
     _renderQuiet() {
         const host = this.shadowRoot?.querySelector(".quiet-host");
@@ -2321,10 +2348,17 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
       border-top: 1px solid var(--divider-color, #e0e0e0);
       transform: translateX(-50%) rotate(45deg);
     }
-    .sched-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .sched-pop.up::before {
+      top: auto; bottom: -7px;
+      border-left: none; border-top: none;
+      border-right: 1px solid var(--divider-color, #e0e0e0);
+      border-bottom: 1px solid var(--divider-color, #e0e0e0);
+    }
+    .sched-head { display: flex; align-items: flex-start; gap: 8px; }
+    .sched-title { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; flex: 1; min-width: 0; }
     .sched-name { font-weight: 700; font-size: 14px; }
     .sched-close {
-      margin-left: auto; background: none; border: none; cursor: pointer;
+      margin-left: auto; flex-shrink: 0; background: none; border: none; cursor: pointer;
       color: var(--secondary-text-color); padding: 2px; border-radius: 6px; display: flex;
     }
     .sched-close:hover { background: var(--secondary-background-color); }
@@ -2341,6 +2375,8 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
     .sched-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .sched-row.sched-disabled { opacity: 0.45; pointer-events: none; }
     .sched-lab { font-size: 12px; color: var(--secondary-text-color); width: 64px; flex-shrink: 0; }
+    .sched-pairs { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
+    .sched-pair { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
     .sched-tl { font-size: 11px; color: var(--secondary-text-color); }
     .sched-time {
       font-family: ui-monospace, 'Roboto Mono', monospace; font-size: 13px;
