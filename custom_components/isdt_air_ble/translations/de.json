@@ -1,0 +1,328 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "ISDT-Gerät einrichten",
+        "description": "Bestätige das gefundene ISDT-Gerät, um es zu Home Assistant hinzuzufügen."
+      },
+      "bluetooth_confirm": {
+        "title": "Gefundenes Gerät bestätigen",
+        "description": "Möchtest du **{name}** zu Home Assistant hinzufügen?\n\nKlicke auf Senden, um das Koppeln zu starten."
+      },
+      "battair_confirm": {
+        "title": "BattAir hinzufügen",
+        "description": "Möchtest du **{name}** ({address}) zu Home Assistant hinzufügen?\n\nDer Akku wird nur über seine Bluetooth-Broadcasts gelesen, Koppeln oder Verbinden ist nicht nötig."
+      },
+      "pair": {
+        "title": "Mit {model} koppeln",
+        "description": "Klicke auf Senden, um das Koppeln zu starten.\n\nWenn dein Gerät piept und eine Bestätigung verlangt (wie der MASS2), **drücke innerhalb von 30 Sekunden eine beliebige Taste daran**. Geräte ohne Tasten (wie C4 Air oder Power 200) nehmen das Koppeln automatisch an, du musst nichts tun."
+      },
+      "show_device_info": {
+        "title": "Geräteinfo",
+        "description": "Verbindung zu **{name}** hergestellt.\n\n**Hardware-Version:** {hw_version}\n**Firmware-Version:** {fw_version}\n**Seriennummer:** {serial_number}\n\n**GATT-Characteristics:**\n{characteristics}\n\nKlicke auf Senden, um die Einrichtung abzuschließen."
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zum Gerät fehlgeschlagen. Prüfe, ob es eingeschaltet und in Reichweite ist.",
+      "pairing_failed": "Zeitüberschreitung beim Koppeln. Wenn dein Gerät Tasten hat, versuche es erneut und drücke innerhalb von 30 Sekunden eine Taste. Andernfalls prüfe, ob das Gerät eingeschaltet, in Reichweite und nicht mit der ISDT-App verbunden ist."
+    },
+    "abort": {
+      "already_configured": "Das Gerät ist bereits eingerichtet.",
+      "no_devices_found": "Kein ISDT-Gerät gefunden. Prüfe, ob es eingeschaltet und in Reichweite ist."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "ISDT-Geräteoptionen",
+        "data": {
+          "command_interval": "Befehlsabstand (Millisekunden)",
+          "phantom_threshold": "Schwelle für Scheinlast (W)",
+          "phantom_debounce": "Entprellzeit für Scheinlast (Sekunden)",
+          "phantom_sustain": "Mindestdauer niedriger Leistung (Sekunden)"
+        },
+        "data_description": {
+          "command_interval": "Pause zwischen zwei Bluetooth-Befehlen beim Abfragen (100–1000 ms, Standard 100). Erhöhe den Wert, wenn Ladegerätwerte alle paar Sekunden ausfallen: Bei schwächerer Verbindung überspringen manche Ladegeräte Befehle, die zu dicht hintereinander kommen. Höhere Werte aktualisieren die Messwerte seltener.",
+          "phantom_threshold": "Nur Adapter. Darüber gilt ein Port sofort als aktiv (echtes Laden). Darunter greift die Mindestdauer. 0 schaltet den Scheinlast-Filter ganz ab.",
+          "phantom_debounce": "Nur Adapter. So lange muss die Leistung unter der unteren Schwelle bleiben, bevor ein aktiver Port wieder auf aus geht. Überbrückt kurze Einbrüche beim Neuaushandeln von PD.",
+          "phantom_sustain": "Nur Adapter. Langsame Verbraucher (z. B. elektrische Zahnbürsten mit ca. 0,5 W) müssen so lange durchgehend über der unteren Schwelle liegen, bevor sie als aktiv gelten. Kurze Pulse von Ladepads (2–3 s) erreichen diese Dauer nie und bleiben gefiltert."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battair_voltage": { "name": "Spannung" },
+      "battair_cell_voltage_avg": { "name": "Mittlere Zellspannung" },
+      "battair_battery": { "name": "Ladestand" },
+      "battair_temperature": { "name": "Temperatur" },
+      "battair_cycles": { "name": "Zyklen" },
+      "battair_cells": { "name": "Zellen" },
+      "battair_capacity": { "name": "Kapazität" },
+      "battair_battery_type": {
+        "name": "Akkutyp",
+        "state": {
+          "lihv": "LiHV",
+          "lipo": "LiPo",
+          "liion": "Li-Ion",
+          "life": "LiFe",
+          "pb": "Blei",
+          "nimh": "NiMH/NiCd",
+          "liuhv": "LiUHV"
+        }
+      },
+      "battair_rssi": { "name": "Signalstärke" },
+      "battair_last_seen": { "name": "Zuletzt gesehen" },
+      "input_voltage": {
+        "name": "Eingangsspannung"
+      },
+      "input_current": {
+        "name": "Eingangsstrom"
+      },
+      "total_charging_current": {
+        "name": "Gesamter Ladestrom"
+      },
+      "rssi": {
+        "name": "Signalstärke"
+      },
+      "output_voltage": {
+        "name": "Ausgangsspannung"
+      },
+      "charging_current": {
+        "name": "Ladestrom"
+      },
+      "status": {
+        "name": "Schacht {slot} Status",
+        "state": {
+          "empty": "Leer",
+          "idle": "Bereit",
+          "charging": "Lädt",
+          "done": "Fertig",
+          "error": "Fehler"
+        }
+      },
+      "capacity": {
+        "name": "Kapazität"
+      },
+      "capacity_done": {
+        "name": "Geladene Kapazität"
+      },
+      "energy_done": {
+        "name": "Geladene Energie"
+      },
+      "charge_time": {
+        "name": "Lädt seit"
+      },
+      "battery_type": {
+        "name": "Akkutyp"
+      },
+      "charge_current_setting": {
+        "name": "Eingestellter Ladestrom"
+      },
+      "cutoff_setting": {
+        "name": "Eingestellte Abschaltung"
+      },
+      "capacity_limit_setting": {
+        "name": "Eingestellte Kapazitätsgrenze"
+      },
+      "internal_resistance": {
+        "name": "Innenwiderstand"
+      },
+      "cell_1": { "name": "Zelle 1 Spannung" },
+      "cell_2": { "name": "Zelle 2 Spannung" },
+      "cell_3": { "name": "Zelle 3 Spannung" },
+      "cell_4": { "name": "Zelle 4 Spannung" },
+      "cell_5": { "name": "Zelle 5 Spannung" },
+      "cell_6": { "name": "Zelle 6 Spannung" },
+      "cell_7": { "name": "Zelle 7 Spannung" },
+      "cell_8": { "name": "Zelle 8 Spannung" },
+      "cell_9": { "name": "Zelle 9 Spannung" },
+      "cell_10": { "name": "Zelle 10 Spannung" },
+      "cell_11": { "name": "Zelle 11 Spannung" },
+      "cell_12": { "name": "Zelle 12 Spannung" },
+      "cell_13": { "name": "Zelle 13 Spannung" },
+      "cell_14": { "name": "Zelle 14 Spannung" },
+      "cell_15": { "name": "Zelle 15 Spannung" },
+      "cell_16": { "name": "Zelle 16 Spannung" },
+      "schedule_state": {
+        "name": "Zeitplan",
+        "state": {
+          "none": "Kein Zeitplan",
+          "on": "An (im Zeitfenster)",
+          "waiting": "Aus (außerhalb des Zeitfensters)",
+          "forced": "Manuell an"
+        }
+      },
+      "port_status": {
+        "name": "{port} Status",
+        "state": {
+          "off": "Aus",
+          "idle": "Bereit",
+          "active": "Aktiv"
+        }
+      },
+      "port_voltage": {
+        "name": "Spannung"
+      },
+      "port_current": {
+        "name": "Strom"
+      },
+      "port_power": {
+        "name": "Leistung"
+      },
+      "port_protocol": {
+        "name": "Protokoll",
+        "state": {
+          "none": "Keins",
+          "pd": "USB PD",
+          "fast_charge": "Schnellladen",
+          "other": "Andere",
+          "qc2": "QC 2.0",
+          "qc3": "QC 3.0",
+          "pd2": "USB PD 2.0",
+          "pd3": "USB PD 3.0"
+        }
+      },
+      "port_energy": {
+        "name": "Energie der Sitzung"
+      },
+      "phone_battery": {
+        "name": "Handy-Akku"
+      },
+      "total_power": {
+        "name": "Gesamtleistung"
+      }
+    },
+    "binary_sensor": {
+      "battair_cell_voltage_low": { "name": "Mittlere Zellspannung niedrig" },
+      "battair_error_log": { "name": "Fehlerprotokoll" },
+      "battair_storage_discharge": { "name": "Lagerentladung" },
+      "battair_transport_mode": { "name": "Transportmodus" },
+      "connected": {
+        "name": "Verbunden"
+      },
+      "slot_charging": {
+        "name": "Lädt"
+      },
+      "battery_inserted": {
+        "name": "Akku eingelegt"
+      },
+      "slot_error": {
+        "name": "Fehler"
+      },
+      "port_active": {
+        "name": "Aktiv"
+      }
+    },
+    "switch": {
+      "beep": {
+        "name": "Signalton"
+      },
+      "quiet_hours": {
+        "name": "Ruhezeit"
+      },
+      "scheduled_output": {
+        "name": "Geplante Ausgabe"
+      },
+      "force_on": {
+        "name": "Manuell einschalten"
+      }
+    },
+    "select": {
+      "volume": {
+        "name": "Lautstärke",
+        "state": {
+          "low": "Niedrig",
+          "medium": "Mittel",
+          "high": "Hoch"
+        }
+      },
+      "quiet_hours_days": {
+        "name": "Ruhezeit Tage",
+        "state": {
+          "every_day": "Jeden Tag",
+          "weekdays": "Werktags",
+          "weekend": "Wochenende",
+          "custom": "Benutzerdefiniert"
+        }
+      },
+      "scheduled_output_days": {
+        "name": "Geplante Ausgabe Tage",
+        "state": {
+          "every_day": "Jeden Tag",
+          "weekdays": "Werktags",
+          "weekend": "Wochenende",
+          "custom": "Benutzerdefiniert"
+        }
+      }
+    },
+    "time": {
+      "quiet_hours_start": {
+        "name": "Ruhezeit Beginn"
+      },
+      "quiet_hours_end": {
+        "name": "Ruhezeit Ende"
+      },
+      "scheduled_output_on": {
+        "name": "Geplante Ausgabe an"
+      },
+      "scheduled_output_off": {
+        "name": "Geplante Ausgabe aus"
+      }
+    },
+    "update": {
+      "firmware": {
+        "name": "Firmware"
+      }
+    }
+  },
+  "issues": {
+    "standalone_card_installed": {
+      "title": "Eigenständige ISDT Charger Card ist noch installiert",
+      "description": "Die ISDT Charger Card wird jetzt mit dieser Integration ausgeliefert und muss nicht mehr separat installiert werden.\n\nEine eigenständige Kopie der Card ist noch als Dashboard-Ressource registriert (`{url}`). Beide Kopien registrieren dasselbe Card-Element und nur eine davon gewinnt, daher kann die eigenständige Kopie die mitgelieferte, aktuelle Card unbemerkt verdecken.\n\nBitte entferne die eigenständige Installation:\n\n1. Über HACS installiert: Öffne HACS, suche *ISDT Charger Card* und entferne sie (damit wird auch die Dashboard-Ressource entfernt).\n2. Manuell hinzugefügt: Lösche die Ressource unter *Einstellungen → Dashboards → Ressourcen* und entferne die Datei aus deinem `www`-Ordner.\n\nDeine Dashboards funktionieren unverändert weiter, die mitgelieferte Card verwendet denselben Typ `custom:isdt-charger-card`."
+    }
+  },
+  "exceptions": {
+    "not_a_schedule": {
+      "message": "{entity_id} ist kein Zeitplan. Wähle den Schalter Ruhezeit oder den Schalter Geplante Ausgabe eines Ports."
+    }
+  },
+  "selector": {
+    "weekdays": {
+      "options": {
+        "monday": "Montag",
+        "tuesday": "Dienstag",
+        "wednesday": "Mittwoch",
+        "thursday": "Donnerstag",
+        "friday": "Freitag",
+        "saturday": "Samstag",
+        "sunday": "Sonntag"
+      }
+    }
+  },
+  "services": {
+    "set_schedule": {
+      "name": "Zeitplan setzen",
+      "description": "Setzt in einem Schritt die Tage und optional die Zeiten und das Ein/Aus der MASS2-Ruhezeit oder der geplanten Ausgabe eines USB-C-Ports. Jede Kombination von Tagen ist möglich. Liegt der Beginn nach dem Ende, läuft das Zeitfenster über Mitternacht; gleicher Beginn und gleiches Ende bedeuten den ganzen Tag.",
+      "fields": {
+        "days": {
+          "name": "Tage",
+          "description": "Wochentage, an denen der Zeitplan beginnt. Mindestens ein Tag."
+        },
+        "start_time": {
+          "name": "Beginn",
+          "description": "Beginn des Zeitfensters (bei einem Port: wann er einschaltet). Bleibt unverändert, wenn leer."
+        },
+        "end_time": {
+          "name": "Ende",
+          "description": "Ende des Zeitfensters (bei einem Port: wann er ausschaltet). Bleibt unverändert, wenn leer."
+        },
+        "enabled": {
+          "name": "Aktiv",
+          "description": "Schaltet den Zeitplan ein oder aus. Bleibt unverändert, wenn leer."
+        }
+      }
+    }
+  }
+}

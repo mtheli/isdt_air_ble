@@ -502,9 +502,39 @@ CMD_MASS2_SETTINGS_SET = bytearray([0x12, 0xC8])
 # schedules / alarm clocks would not fire at the right time.
 CMD_MASS2_SET_TIME = bytearray([0x12, 0xCE])
 
+# USB schedules ("scheduled output" per USB-C port, C1..C6).
+# Read:  12 C6 -> 31 C7 + 30 bytes (6 ports x {repeat, on[h,m], off[h,m]})
+# Write: 12 C4 + the same 30 bytes -> 31 C5 01 (ack). The device stores the
+# whole block, so a write always carries all six ports.
+CMD_MASS2_USB_SCHEDULES_REQ = bytearray([0x12, 0xC6])
+CMD_MASS2_USB_SCHEDULES_SET = bytearray([0x12, 0xC4])
+
+# Force a port on while its schedule keeps it off: 12 CC (port | 0x80),
+# port 1-based -> 31 CD 01. The firmware has no matching "off" command; the
+# flag is cleared when the port's schedule is switched off (repeat bit 7
+# cleared in a 12 C4 write), on the next day, or on reboot.
+CMD_MASS2_FORCE_ON = 0xCC
+
 # MASS2 response command bytes
 RESP_MASS2_WORK_STATUS = 0xC3   # WorkStatusResp (8 ports × 7 bytes)
 RESP_MASS2_SETTINGS    = 0xCB   # SettingsResp (21 bytes)
+RESP_MASS2_USB_SCHEDULES = 0xC7  # USB schedules (2 + 30 bytes)
+# One-byte acknowledgements (frame = 31 <cmd> 01)
+RESP_MASS2_ACKS = (0xC5, 0xC9, 0xCD, 0xCF)
+
+# Ports with a schedule (USB-C1..C6; the USB-A ports have none)
+MASS2_SCHEDULE_PORT_COUNT = 6
+
+# Repeat byte shared by the quiet hours, the alarms and the port schedules:
+# bit 7 = enabled, bits 0..6 = Monday..Sunday. Switching off keeps the days.
+MASS2_REPEAT_ENABLED = 0x80
+MASS2_REPEAT_DAYS = 0x7F
+
+# Per-port schedule state (WorkStatus byte +2)
+MASS2_SCHEDULE_STATE_OFF = 0      # no schedule, port always on
+MASS2_SCHEDULE_STATE_ON = 1       # schedule on, inside the window
+MASS2_SCHEDULE_STATE_WAITING = 2  # schedule on, outside the window (port off)
+MASS2_SCHEDULE_STATE_FORCED = 3   # schedule on, forced on
 
 # Frame header byte (byte 0) for normal MASS2 data packets.
 # Verified against MASS2Fragment.onBleByte: `if (bArr[0] != 49)` = 0x31.

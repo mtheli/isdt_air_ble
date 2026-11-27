@@ -81,7 +81,7 @@ def test_every_status_frame_decodes(fixture):
     assert frames
     for frame in frames:
         assert len(frame) == 59
-        ports, _ = parse_mass2_responses([frame])
+        ports, _, _ = parse_mass2_responses([frame])
         assert ports is not None
         assert all(key in ports[p] for p in range(8) for key in ("voltage", "current"))
         # Byte 2 is the device's own total, which tracks the port sum.
@@ -101,7 +101,7 @@ def test_connect_bind_and_hardware_info():
 
 
 def test_connect_settings_response():
-    _, settings = parse_mass2_responses(_notifies("connect.jsonl"))
+    _, settings, _ = parse_mass2_responses(_notifies("connect.jsonl"))
     assert settings == {
         "scheduledMute": 0,
         "volume": 0,
@@ -126,7 +126,7 @@ def test_connect_set_time_matches_builder():
 
 
 def test_connect_all_ports_unloaded():
-    ports, _ = parse_mass2_responses(_status_frames("connect.jsonl")[-1:])
+    ports, _, _ = parse_mass2_responses(_status_frames("connect.jsonl")[-1:])
     assert _loaded(ports) == set()
     assert ports["_total_power"] == 0
     # C1..C4 (pads, micro-USB, Lightning) are powered at 5.088 V, 0 mA;
@@ -135,14 +135,14 @@ def test_connect_all_ports_unloaded():
 
 
 def test_one_port_usb_pd_5v():
-    ports, _ = parse_mass2_responses(_status_frames("one_port_pd5v.jsonl")[-1:])
+    ports, _, _ = parse_mass2_responses(_status_frames("one_port_pd5v.jsonl")[-1:])
     assert _loaded(ports) == {C2}
     assert ports[C2]["protocol_str"] == "pd"
     assert ports[C2]["voltage"] == pytest.approx(5.088)
 
 
 def test_two_ports_usb_pd_9v():
-    ports, _ = parse_mass2_responses(_status_frames("two_ports_pd9v.jsonl")[-1:])
+    ports, _, _ = parse_mass2_responses(_status_frames("two_ports_pd9v.jsonl")[-1:])
     assert _loaded(ports) == {C2, C6}
     assert ports[C6]["protocol_str"] == "pd"
     assert 9.0 < ports[C6]["voltage"] < 9.5
@@ -151,7 +151,7 @@ def test_two_ports_usb_pd_9v():
 
 
 def test_five_ports_mixed_protocols():
-    ports, _ = parse_mass2_responses(_status_frames("five_ports.jsonl")[-1:])
+    ports, _, _ = parse_mass2_responses(_status_frames("five_ports.jsonl")[-1:])
     assert _loaded(ports) >= {C2, C3, C5, C6, A1}
     assert ports[C2]["protocol_str"] == "pd"
     assert ports[C6]["protocol_str"] == "pd"
@@ -175,14 +175,14 @@ def test_idle_pad_on_c1_shows_phantom_pulses(fixture):
 
 
 def test_all_unplugged_ends_at_zero():
-    ports, _ = parse_mass2_responses(_status_frames("all_unplugged.jsonl")[-1:])
+    ports, _, _ = parse_mass2_responses(_status_frames("all_unplugged.jsonl")[-1:])
     assert ports["_total_power"] == 0
     assert _loaded(ports) <= {C1, C2}  # at most the idle pads' pulses
 
 
 def test_settings_writes_match_builder():
     """Beep on, volume medium, volume low, beep off — byte-exact."""
-    _, settings = parse_mass2_responses(_notifies("connect.jsonl"))
+    _, settings, _ = parse_mass2_responses(_notifies("connect.jsonl"))
     writes = _writes("settings_set.jsonl", "SettingsSetReq")
     steps = [{"scheduledMute": 1}, {"volume": 1}, {"volume": 0}, {"scheduledMute": 0}]
     assert len(writes) == len(steps)
@@ -198,9 +198,8 @@ def test_settings_writes_match_builder():
 def test_reassembly_at_mtu_23(fixture):
     """Split every notification into 20-byte chunks and reassemble.
 
-    Uses the coordinator's real handler. Status and settings frames must
-    come out unchanged; the 3-byte acks (0xC9, 0xCF) the handler does not
-    know must be dropped without breaking the following frames.
+    Uses the coordinator's real handler. Status, settings, schedule and
+    the 3-byte ack frames must all come out unchanged.
     """
     coord = pytest.importorskip("isdt_air_ble.coordinator")
     import asyncio
@@ -218,5 +217,7 @@ def test_reassembly_at_mtu_23(fixture):
     out = []
     while not c._response_queue.empty():
         out.append(c._response_queue.get_nowait())
-    expected = [f for f in frames if f[1] in (0xC3, 0xCB)]
+    expected = [
+        f for f in frames if f[1] in (0xC3, 0xCB, 0xC7, 0xC5, 0xC9, 0xCD, 0xCF)
+    ]
     assert out == expected

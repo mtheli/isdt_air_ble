@@ -145,6 +145,15 @@
       "cell_14": { "name": "Cell 14 Voltage" },
       "cell_15": { "name": "Cell 15 Voltage" },
       "cell_16": { "name": "Cell 16 Voltage" },
+      "schedule_state": {
+        "name": "Schedule",
+        "state": {
+          "none": "No schedule",
+          "on": "On (in window)",
+          "waiting": "Off (outside window)",
+          "forced": "Forced on"
+        }
+      },
       "port_status": {
         "name": "{port} Status",
         "state": {
@@ -209,6 +218,15 @@
     "switch": {
       "beep": {
         "name": "Beep"
+      },
+      "quiet_hours": {
+        "name": "Quiet hours"
+      },
+      "scheduled_output": {
+        "name": "Scheduled output"
+      },
+      "force_on": {
+        "name": "Force on"
       }
     },
     "select": {
@@ -219,6 +237,38 @@
           "medium": "Medium",
           "high": "High"
         }
+      },
+      "quiet_hours_days": {
+        "name": "Quiet hours days",
+        "state": {
+          "every_day": "Every day",
+          "weekdays": "Weekdays",
+          "weekend": "Weekend",
+          "custom": "Custom"
+        }
+      },
+      "scheduled_output_days": {
+        "name": "Scheduled output days",
+        "state": {
+          "every_day": "Every day",
+          "weekdays": "Weekdays",
+          "weekend": "Weekend",
+          "custom": "Custom"
+        }
+      }
+    },
+    "time": {
+      "quiet_hours_start": {
+        "name": "Quiet hours start"
+      },
+      "quiet_hours_end": {
+        "name": "Quiet hours end"
+      },
+      "scheduled_output_on": {
+        "name": "Scheduled output on"
+      },
+      "scheduled_output_off": {
+        "name": "Scheduled output off"
       }
     },
     "update": {
@@ -231,6 +281,48 @@
     "standalone_card_installed": {
       "title": "Standalone ISDT Charger Card is still installed",
       "description": "The ISDT Charger Card now ships with this integration and no longer needs to be installed separately.\n\nA standalone copy of the card is still registered as a dashboard resource (`{url}`). Both copies register the same card element and only one of them wins, so the standalone copy can silently shadow the bundled, up-to-date card.\n\nPlease remove the standalone installation:\n\n1. If installed via HACS: open HACS, find *ISDT Charger Card* and remove it (this also removes the dashboard resource).\n2. If added manually: delete the resource under *Settings → Dashboards → Resources* and remove the file from your `www` folder.\n\nYour dashboards keep working unchanged, the bundled card uses the same `custom:isdt-charger-card` type."
+    }
+  },
+  "exceptions": {
+    "not_a_schedule": {
+      "message": "{entity_id} is not a schedule. Pick the Quiet hours switch or a port's Scheduled output switch."
+    }
+  },
+  "selector": {
+    "weekdays": {
+      "options": {
+        "monday": "Monday",
+        "tuesday": "Tuesday",
+        "wednesday": "Wednesday",
+        "thursday": "Thursday",
+        "friday": "Friday",
+        "saturday": "Saturday",
+        "sunday": "Sunday"
+      }
+    }
+  },
+  "services": {
+    "set_schedule": {
+      "name": "Set schedule",
+      "description": "Sets the days, and optionally the times and on/off, of the MASS2 quiet hours or of a USB-C port's scheduled output in one step. Any combination of days is possible. A start time after the end time runs past midnight; the same start and end time means the whole day.",
+      "fields": {
+        "days": {
+          "name": "Days",
+          "description": "Weekdays on which the schedule starts. At least one day."
+        },
+        "start_time": {
+          "name": "Start time",
+          "description": "Start of the window (for a port: when it switches on). Unchanged if left out."
+        },
+        "end_time": {
+          "name": "End time",
+          "description": "End of the window (for a port: when it switches off). Unchanged if left out."
+        },
+        "enabled": {
+          "name": "Enabled",
+          "description": "Switch the schedule on or off. Unchanged if left out."
+        }
+      }
     }
   }
 }

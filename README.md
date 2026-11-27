@@ -151,6 +151,9 @@ are read-only.
 | Signal Strength | RSSI (dBm) | BLE signal strength (disabled by default) |
 | Beep | Switch | Toggle the buzzer for USB events |
 | Volume | Select | Buzzer volume — low / medium / high |
+| Quiet hours | Switch, config | Mute the buzzer in a daily time window |
+| Quiet hours start / end | Time, config | Window of the quiet hours |
+| Quiet hours days | Select, config | `every_day`, `weekdays`, `weekend`; other combinations show as `custom` |
 
 **Per USB port (sub-device):**
 
@@ -161,6 +164,44 @@ are read-only.
 | Current | Current (A) | Output current |
 | Power | Power (W) | Current power draw |
 | Protocol | Enum | Charging protocol (`None`, `USB PD`, `Fast Charge`) |
+
+**Per USB-C port, C1–C6 only:**
+
+| Entity | Type | Description |
+|--------|------|-------------|
+| Scheduled output | Switch, config | Power the port only in a daily time window |
+| Scheduled output on / off | Time, config | When the port switches on and off |
+| Scheduled output days | Select, config | `every_day`, `weekdays`, `weekend`; other combinations show as `custom` |
+| Force on | Switch | Power the port now although the schedule has it off (available while the schedule is on) |
+| Schedule | Enum | `none`, `on` (inside the window), `waiting` (outside the window), `forced` |
+
+#### Quiet hours and port schedules
+
+The days select only offers the three presets. For any other combination of days, use the **Set schedule** action
+(`isdt_air_ble.set_schedule`) on the *Quiet hours* switch or on a port's *Scheduled output* switch:
+
+```yaml
+action: isdt_air_ble.set_schedule
+target:
+  entity_id: switch.isdt_mass2_usb_c1_scheduled_output
+data:
+  days: [monday, wednesday, friday]
+  start_time: "07:00"
+  end_time: "22:00"
+  enabled: true
+```
+
+Only `days` is required; times and on/off stay as they are when left out.
+
+How the MASS2 handles the window:
+
+- A start time after the end time runs past midnight. The days are the days the window starts.
+- The same start and end time means the whole day.
+- Force on lasts until the next day starts or the adapter restarts; changing the days keeps it. Switching
+  *Force on* off goes back to the schedule right away (the integration switches the schedule off and on again,
+  the MASS2 has no command for it).
+- Every schedule change is written to the adapter's flash memory, so automations should not change it every few
+  minutes.
 
 ### BattAir packs and plugins
 

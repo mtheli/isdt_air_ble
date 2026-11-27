@@ -20,6 +20,11 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .battair_entities import async_setup_sensors as async_setup_battair
 from .const import (
+    MASS2_SCHEDULE_PORT_COUNT,
+    MASS2_SCHEDULE_STATE_FORCED,
+    MASS2_SCHEDULE_STATE_OFF,
+    MASS2_SCHEDULE_STATE_ON,
+    MASS2_SCHEDULE_STATE_WAITING,
     DOMAIN,
     is_battair_entry,
     AdapterProtocol,
@@ -218,6 +223,8 @@ def _setup_adapter_sensors(coordinator, entities):
             entities.append(ISDTPS200EnergySensor(coordinator, port, port_num))
         else:
             entities.append(ISDTMASS2ProtocolSensor(coordinator, port, port_num))
+            if port_num <= MASS2_SCHEDULE_PORT_COUNT:
+                entities.append(ISDTMASS2ScheduleStateSensor(coordinator, port, port_num))
         # Port status overview → main device
         entities.append(ISDTMASS2PortStatusSensor(coordinator, port, port_num))
 
@@ -637,6 +644,32 @@ class ISDTMASS2SensorBase(CoordinatorEntity, SensorEntity):
         if self.coordinator.data and self._channel in self.coordinator.data:
             return self.coordinator.data[self._channel].get(self._data_key)
         return None
+
+
+class ISDTMASS2ScheduleStateSensor(ISDTMASS2SensorBase):
+    """Scheduled output state of a USB-C port, as reported by the device.
+
+    none = no schedule (port always on), on = inside the window,
+    waiting = outside the window (port held off), forced = forced on.
+    """
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["none", "on", "waiting", "forced"]
+    _attr_icon = "mdi:timer-outline"
+    _STATES = {
+        MASS2_SCHEDULE_STATE_OFF: "none",
+        MASS2_SCHEDULE_STATE_ON: "on",
+        MASS2_SCHEDULE_STATE_WAITING: "waiting",
+        MASS2_SCHEDULE_STATE_FORCED: "forced",
+    }
+
+    def __init__(self, coordinator, channel, port_num):
+        super().__init__(coordinator, "schedule_state", "schedule_state", channel, port_num)
+
+    @property
+    def native_value(self):
+        raw = super().native_value
+        return None if raw is None else self._STATES.get(raw)
 
 
 class ISDTMASS2VoltageSensor(ISDTMASS2SensorBase):

@@ -1,0 +1,74 @@
+{"t": "2026-11-26T18:21:55.377", "kind": "meta", "mac": "AA:BB:CC:DD:EE:01", "label": "mass2_app_schedules", "model": "MASS2", "mtu": 247, "note": "Vendor app (Polying 2.1.6) on Android, HCI snoop. Settings: beep on, volume medium, quiet hours on, Sunday removed, start/end changed, off; alarm 4 on, days Wed+Sun, off. USB schedules: C1 on, off time 19:12, on time 19:02 (port now outside its window), force-on C1, Sunday removed, schedule off/on/off; C5 on with no days, off. WorkStatus frames kept only where a port's schedule state changes. Bind and hardware-info frames left out."}
+{"t": "2026-11-26T18:21:57.621", "kind": "write", "char": "AF01", "purpose": "SetTimeReq", "len": 13, "hex": "12 ce 01 12 1a 00 c2 02 1a 0b 1a 04 01"}
+{"t": "2026-11-26T18:21:57.656", "kind": "notify", "char": "AF01", "cls": "SetTimeAck", "len": 3, "hex": "31 cf 01"}
+{"t": "2026-11-26T18:21:58.224", "kind": "write", "char": "AF01", "purpose": "USBSchedulesReq", "len": 2, "hex": "12 c6"}
+{"t": "2026-11-26T18:21:58.254", "kind": "notify", "char": "AF01", "cls": "USBSchedulesResp", "len": 32, "hex": "31 c7 7f 12 00 13 00 18 00 00 00 10 00 01 00 01 01 01 00 00 00 00 00 00 1a 13 22 7f 12 05 12 0a"}
+{"t": "2026-11-26T18:21:58.429", "kind": "write", "char": "AF01", "purpose": "SettingsReq", "len": 2, "hex": "12 ca"}
+{"t": "2026-11-26T18:21:58.449", "kind": "notify", "char": "AF01", "cls": "SettingsResp", "len": 21, "hex": "31 cb 00 02 7e 12 05 12 0a 10 07 00 20 0a 00 08 12 0c 00 0b 00"}
+{"t": "2026-11-26T18:21:58.659", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 14 01 00 00 e0 13 00 00 01 01 00 e0 13 00 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 20 25 2f 08 00 00 00 c4 13 00 00 00 00 04 c4 13 00 00"}
+{"t": "2026-11-26T18:22:17.275", "kind": "write", "char": "AF01", "purpose": "SettingsSetReq", "len": 21, "hex": "12 c8 01 02 7e 12 05 12 0a 10 07 00 20 0a 00 08 12 0c 00 0b 00"}
+{"t": "2026-11-26T18:22:17.304", "kind": "notify", "char": "AF01", "cls": "SettingsSetAck", "len": 3, "hex": "31 c9 01"}
+{"t": "2026-11-26T18:22:23.397", "kind": "write", "char": "AF01", "purpose": "SetTimeReq", "len": 13, "hex": "12 ce 01 12 1a 1a e6 01 1a 0b 1a 04 01"}
+{"t": "2026-11-26T18:22:23.424", "kind": "notify", "char": "AF01", "cls": "SetTimeAck", "len": 3, "hex": "31 cf 01"}
+{"t": "2026-11-26T18:22:30.374", "kind": "write", "char": "AF01", "purpose": "SettingsSetReq", "len": 21, "hex": "12 c8 01 01 7e 12 05 12 0a 10 07 00 20 0a 00 08 12 0c 00 0b 00"}
+{"t": "2026-11-26T18:22:30.459", "kind": "notify", "char": "AF01", "cls": "SettingsSetAck", "len": 3, "hex": "31 c9 01"}
+{"t": "2026-11-26T18:22:39.818", "kind": "write", "char": "AF01", "purpose": "SettingsSetReq", "len": 21, "hex": "12 c8 01 01 fe 12 05 12 0a 10 07 00 20 0a 00 08 12 0c 00 0b 00"}
+{"t": "2026-11-26T18:22:39.849", "kind": "notify", "char": "AF01", "cls": "SettingsSetAck", "len": 3, "hex": "31 c9 01"}
+{"t": "2026-11-26T18:22:57.658", "kind": "write", "char": "AF01", "purpose": "SettingsSetReq", "len": 21, "hex": "12 c8 01 01 be 12 05 12 0a 10 07 00 20 0a 00 08 12 0c 00 0b 00"}
+{"t": "2026-11-26T18:22:57.683", "kind": "notify", "char": "AF01", "cls": "SettingsSetAck", "len": 3, "hex": "31 c9 01"}
+{"t": "2026-11-26T18:23:23.475", "kind": "write", "char": "AF01", "purpose": "SetTimeReq", "len": 13, "hex": "12 ce 01 12 1b 1a 36 02 1a 0b 1a 04 01"}
+{"t": "2026-11-26T18:23:23.499", "kind": "notify", "char": "AF01", "cls": "SetTimeAck", "len": 3, "hex": "31 cf 01"}
+{"t": "2026-11-26T18:23:45.594", "kind": "write", "char": "AF01", "purpose": "SettingsSetReq", "len": 21, "hex": "12 c8 01 01 be 13 06 14 0b 10 07 00 20 0a 00 08 12 0c 00 0b 00"}
+{"t": "2026-11-26T18:23:45.639", "kind": "notify", "char": "AF01", "cls": "SettingsSetAck", "len": 3, "hex": "31 c9 01"}
+{"t": "2026-11-26T18:24:06.902", "kind": "write", "char": "AF01", "purpose": "SettingsSetReq", "len": 21, "hex": "12 c8 01 01 be 14 07 14 0b 10 07 00 20 0a 00 08 12 0c 00 0b 00"}
+{"t": "2026-11-26T18:24:06.924", "kind": "notify", "char": "AF01", "cls": "SettingsSetAck", "len": 3, "hex": "31 c9 01"}
+{"t": "2026-11-26T18:24:16.546", "kind": "write", "char": "AF01", "purpose": "SettingsSetReq", "len": 21, "hex": "12 c8 01 01 3e 14 07 14 0b 10 07 00 20 0a 00 08 12 0c 00 0b 00"}
+{"t": "2026-11-26T18:24:16.584", "kind": "notify", "char": "AF01", "cls": "SettingsSetAck", "len": 3, "hex": "31 c9 01"}
+{"t": "2026-11-26T18:24:20.850", "kind": "write", "char": "AF01", "purpose": "SettingsSetReq", "len": 21, "hex": "12 c8 01 01 3e 14 07 14 0b 10 07 00 20 0a 00 08 12 0c 80 0b 00"}
+{"t": "2026-11-26T18:24:20.889", "kind": "notify", "char": "AF01", "cls": "SettingsSetAck", "len": 3, "hex": "31 c9 01"}
+{"t": "2026-11-26T18:24:23.288", "kind": "write", "char": "AF01", "purpose": "SetTimeReq", "len": 13, "hex": "12 ce 01 12 1c 1a 7d 01 1a 0b 1a 04 01"}
+{"t": "2026-11-26T18:24:23.350", "kind": "notify", "char": "AF01", "cls": "SetTimeAck", "len": 3, "hex": "31 cf 01"}
+{"t": "2026-11-26T18:24:39.482", "kind": "write", "char": "AF01", "purpose": "SettingsSetReq", "len": 21, "hex": "12 c8 01 01 3e 14 07 14 0b 10 07 00 20 0a 00 08 12 0c c4 0b 00"}
+{"t": "2026-11-26T18:24:39.549", "kind": "notify", "char": "AF01", "cls": "SettingsSetAck", "len": 3, "hex": "31 c9 01"}
+{"t": "2026-11-26T18:24:48.504", "kind": "write", "char": "AF01", "purpose": "SettingsSetReq", "len": 21, "hex": "12 c8 01 01 3e 14 07 14 0b 10 07 00 20 0a 00 08 12 0c 44 0b 00"}
+{"t": "2026-11-26T18:24:48.534", "kind": "notify", "char": "AF01", "cls": "SettingsSetAck", "len": 3, "hex": "31 c9 01"}
+{"t": "2026-11-26T18:25:02.656", "kind": "write", "char": "AF01", "purpose": "USBSchedulesSetReq", "len": 32, "hex": "12 c4 ff 12 00 13 00 18 00 00 00 10 00 01 00 01 01 01 00 00 00 00 00 00 1a 13 22 7f 12 05 12 0a"}
+{"t": "2026-11-26T18:25:02.694", "kind": "notify", "char": "AF01", "cls": "USBSchedulesSetAck", "len": 3, "hex": "31 c5 01"}
+{"t": "2026-11-26T18:25:02.905", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 13 01 00 01 e0 13 00 00 01 01 00 e0 13 74 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 c0 24 46 07 00 00 00 c8 13 00 00 00 00 04 c8 13 00 00"}
+{"t": "2026-11-26T18:25:23.352", "kind": "write", "char": "AF01", "purpose": "SetTimeReq", "len": 13, "hex": "12 ce 01 12 1d 1a bb 01 1a 0b 1a 04 01"}
+{"t": "2026-11-26T18:25:23.409", "kind": "notify", "char": "AF01", "cls": "SetTimeAck", "len": 3, "hex": "31 cf 01"}
+{"t": "2026-11-26T18:25:35.573", "kind": "write", "char": "AF01", "purpose": "USBSchedulesSetReq", "len": 32, "hex": "12 c4 ff 12 00 13 0c 18 00 00 00 10 00 01 00 01 01 01 00 00 00 00 00 00 1a 13 22 7f 12 05 12 0a"}
+{"t": "2026-11-26T18:25:35.619", "kind": "notify", "char": "AF01", "cls": "USBSchedulesSetAck", "len": 3, "hex": "31 c5 01"}
+{"t": "2026-11-26T18:25:52.349", "kind": "write", "char": "AF01", "purpose": "USBSchedulesSetReq", "len": 32, "hex": "12 c4 ff 13 02 13 0c 18 00 00 00 10 00 01 00 01 01 01 00 00 00 00 00 00 1a 13 22 7f 12 05 12 0a"}
+{"t": "2026-11-26T18:25:52.434", "kind": "notify", "char": "AF01", "cls": "USBSchedulesSetAck", "len": 3, "hex": "31 c5 01"}
+{"t": "2026-11-26T18:25:52.599", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 12 01 00 02 e0 13 26 00 01 01 00 e0 13 00 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 20 25 46 07 00 00 00 dc 13 00 00 00 00 04 dc 13 00 00"}
+{"t": "2026-11-26T18:25:52.992", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 12 02 00 02 e0 13 00 00 01 01 00 e0 13 00 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 20 25 46 07 00 00 00 ec 13 00 00 00 00 04 ec 13 00 00"}
+{"t": "2026-11-26T18:26:03.615", "kind": "write", "char": "AF01", "purpose": "ForceOnReq", "len": 3, "hex": "12 cc 81"}
+{"t": "2026-11-26T18:26:03.639", "kind": "notify", "char": "AF01", "cls": "ForceOnAck", "len": 3, "hex": "31 cd 01"}
+{"t": "2026-11-26T18:26:03.852", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 12 02 00 03 00 00 00 00 01 01 00 e0 13 00 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 20 25 46 07 00 00 00 d8 13 00 00 00 00 04 d8 13 00 00"}
+{"t": "2026-11-26T18:26:04.059", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 12 00 00 03 00 00 00 00 01 01 00 e0 13 26 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 20 25 46 07 00 00 00 ec 13 00 00 00 00 04 ec 13 00 00"}
+{"t": "2026-11-26T18:26:05.755", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 12 01 00 03 e0 13 00 00 01 01 00 e0 13 00 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 20 25 46 07 00 00 00 c8 13 00 00 00 00 04 c8 13 00 00"}
+{"t": "2026-11-26T18:26:23.251", "kind": "write", "char": "AF01", "purpose": "SetTimeReq", "len": 13, "hex": "12 ce 01 12 1e 1a 54 01 1a 0b 1a 04 01"}
+{"t": "2026-11-26T18:26:23.290", "kind": "notify", "char": "AF01", "cls": "SetTimeAck", "len": 3, "hex": "31 cf 01"}
+{"t": "2026-11-26T18:26:24.271", "kind": "write", "char": "AF01", "purpose": "USBSchedulesSetReq", "len": 32, "hex": "12 c4 bf 13 02 13 0c 18 00 00 00 10 00 01 00 01 01 01 00 00 00 00 00 00 1a 13 22 7f 12 05 12 0a"}
+{"t": "2026-11-26T18:26:24.309", "kind": "notify", "char": "AF01", "cls": "USBSchedulesSetAck", "len": 3, "hex": "31 c5 01"}
+{"t": "2026-11-26T18:26:36.734", "kind": "write", "char": "AF01", "purpose": "USBSchedulesSetReq", "len": 32, "hex": "12 c4 3f 13 02 13 0c 18 00 00 00 10 00 01 00 01 01 01 00 00 00 00 00 00 1a 13 22 7f 12 05 12 0a"}
+{"t": "2026-11-26T18:26:36.759", "kind": "notify", "char": "AF01", "cls": "USBSchedulesSetAck", "len": 3, "hex": "31 c5 01"}
+{"t": "2026-11-26T18:26:36.970", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 12 01 00 00 e0 13 00 00 01 01 00 e0 13 00 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 c0 24 46 07 00 00 00 e8 13 00 00 00 00 04 e8 13 00 00"}
+{"t": "2026-11-26T18:26:42.049", "kind": "write", "char": "AF01", "purpose": "USBSchedulesSetReq", "len": 32, "hex": "12 c4 bf 13 02 13 0c 18 00 00 00 10 00 01 00 01 01 01 00 00 00 00 00 00 1a 13 22 7f 12 05 12 0a"}
+{"t": "2026-11-26T18:26:42.083", "kind": "notify", "char": "AF01", "cls": "USBSchedulesSetAck", "len": 3, "hex": "31 c5 01"}
+{"t": "2026-11-26T18:26:42.295", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 12 01 00 02 e0 13 00 00 01 01 00 e0 13 00 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 c0 24 46 07 00 00 00 ec 13 00 00 00 00 04 ec 13 00 00"}
+{"t": "2026-11-26T18:26:42.580", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 12 02 00 02 e0 13 00 00 01 01 00 e0 13 00 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 c0 24 46 07 00 00 00 e0 13 00 00 00 00 04 e0 13 00 00"}
+{"t": "2026-11-26T18:26:56.608", "kind": "write", "char": "AF01", "purpose": "USBSchedulesSetReq", "len": 32, "hex": "12 c4 3f 13 02 13 0c 18 00 00 00 10 00 01 00 01 01 01 00 00 00 00 00 00 1a 13 22 7f 12 05 12 0a"}
+{"t": "2026-11-26T18:26:56.679", "kind": "notify", "char": "AF01", "cls": "USBSchedulesSetAck", "len": 3, "hex": "31 c5 01"}
+{"t": "2026-11-26T18:26:56.844", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 12 02 00 00 00 00 00 00 01 01 00 e0 13 00 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 c0 24 46 07 00 00 00 f4 13 00 00 00 00 04 f4 13 00 00"}
+{"t": "2026-11-26T18:26:57.268", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 11 00 00 00 00 00 00 00 01 01 00 e0 13 00 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 60 24 46 07 00 00 00 ec 13 00 00 00 00 04 ec 13 00 00"}
+{"t": "2026-11-26T18:26:58.705", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 12 01 00 00 e0 13 00 00 01 01 00 e0 13 00 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 20 25 46 07 00 00 00 d4 13 00 00 00 00 04 d4 13 00 00"}
+{"t": "2026-11-26T18:27:23.424", "kind": "write", "char": "AF01", "purpose": "SetTimeReq", "len": 13, "hex": "12 ce 01 12 1f 1a 15 02 1a 0b 1a 04 01"}
+{"t": "2026-11-26T18:27:23.499", "kind": "notify", "char": "AF01", "cls": "SetTimeAck", "len": 3, "hex": "31 cf 01"}
+{"t": "2026-11-26T18:27:33.879", "kind": "write", "char": "AF01", "purpose": "USBSchedulesSetReq", "len": 32, "hex": "12 c4 3f 13 02 13 0c 18 00 00 00 10 00 01 00 01 01 01 00 00 00 00 80 00 1a 13 22 7f 12 05 12 0a"}
+{"t": "2026-11-26T18:27:33.909", "kind": "notify", "char": "AF01", "cls": "USBSchedulesSetAck", "len": 3, "hex": "31 c5 01"}
+{"t": "2026-11-26T18:27:34.150", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 12 01 00 00 e0 13 00 00 01 01 00 e0 13 00 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 01 00 00 00 00 01 01 00 20 25 46 07 00 00 00 f0 13 00 00 00 00 04 f0 13 00 00"}
+{"t": "2026-11-26T18:27:45.571", "kind": "write", "char": "AF01", "purpose": "USBSchedulesSetReq", "len": 32, "hex": "12 c4 3f 13 02 13 0c 18 00 00 00 10 00 01 00 01 01 01 00 00 00 00 00 00 1a 13 22 7f 12 05 12 0a"}
+{"t": "2026-11-26T18:27:45.594", "kind": "notify", "char": "AF01", "cls": "USBSchedulesSetAck", "len": 3, "hex": "31 c5 01"}
+{"t": "2026-11-26T18:27:45.819", "kind": "notify", "char": "AF01", "cls": "WorkStatusResp", "len": 59, "hex": "31 c3 10 01 00 00 e0 13 00 00 01 01 00 e0 13 00 00 01 00 00 e0 13 00 00 01 00 00 e0 13 00 00 00 00 00 00 00 00 00 01 01 00 c0 24 d2 06 00 00 00 e0 13 00 00 00 00 04 e0 13 00 00"}

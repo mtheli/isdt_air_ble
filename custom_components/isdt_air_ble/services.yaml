@@ -1,0 +1,30 @@
+set_schedule:
+  target:
+    entity:
+      integration: isdt_air_ble
+      domain: switch
+  fields:
+    days:
+      required: true
+      selector:
+        select:
+          multiple: true
+          mode: list
+          translation_key: weekdays
+          options:
+            - monday
+            - tuesday
+            - wednesday
+            - thursday
+            - friday
+            - saturday
+            - sunday
+    start_time:
+      selector:
+        time:
+    end_time:
+      selector:
+        time:
+    enabled:
+      selector:
+        boolean:

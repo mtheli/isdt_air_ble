@@ -10,11 +10,11 @@ function $parcel$interopDefault(a) {
  * discovers all entities via translation_key and sub-device mapping.
  * Supports both chargers (C4 Air etc.) and adapters (MASS2 etc.).
  */ var $76eee68ef692a3c3$exports = {};
-$76eee68ef692a3c3$exports = JSON.parse('{"status_empty":"Empty","status_idle":"Idle","status_charging":"Charging","status_done":"Done","status_error":"Error","header_input":"Input","header_current":"Current","header_power":"Power","header_total_charge":"\u03A3 Charge","info_volt":"Volt","info_amp":"Amp","info_time":"Time","info_type":"Type","tooltip_connected":"Connected","tooltip_disconnected":"Disconnected","config_title":"Title (optional \u2013 defaults to device name)","config_show_model":"Show model as subtitle","config_show_header":"Show header with input stats","error_no_device":"Please select a device","section_usbc":"USB-C","section_usba":"USB-A","gauge_of":"of","active_ports":"Active Ports","load":"Load","volume":"Volume","vol_low":"Low","vol_medium":"Med","vol_high":"High","sound_mute":"Muted","sound_low":"Low volume","sound_medium":"Medium volume","sound_high":"High volume","balance_channel":"CH","balance_no_pack":"no pack","outdated_standalone_active":"An outdated standalone copy of this card is active. Remove the standalone ISDT Charger Card (see Settings \u2192 Repairs) to use the up-to-date version bundled with the integration.","battair_config_title":"Title (optional, default is BattAir)","battair_config_sort":"Sort by","battair_sort_name":"Name","battair_sort_charge":"Charge level (lowest first)","battair_sort_last_seen":"Last seen","battair_config_hide_unavailable":"Hide packs that are out of range","battair_config_show_cycles":"Show charge cycles","battair_empty":"No BattAir packs found. Packs in Bluetooth range are discovered automatically.","battair_all_hidden":"All packs are out of range.","battair_never_seen":"never","battair_error_log":"Error log","battair_low_cell":"Low cell voltage","battair_storage":"Storage discharge","battair_transport":"Transport mode","battair_temperature_alert":"Temperature","battair_last_seen":"Last seen","battair_cycle":"cycle","battair_cycles":"cycles","battair_stat_packs":"Packs","battair_stat_avg":"\xd8 Charge","battair_stat_warnings":"Warnings","battair_stat_away":"Offline"}');
+$76eee68ef692a3c3$exports = JSON.parse('{"status_empty":"Empty","status_idle":"Idle","status_charging":"Charging","status_done":"Done","status_error":"Error","header_input":"Input","header_current":"Current","header_power":"Power","header_total_charge":"\u03A3 Charge","info_volt":"Volt","info_amp":"Amp","info_time":"Time","info_type":"Type","tooltip_connected":"Connected","tooltip_disconnected":"Disconnected","config_title":"Title (optional \u2013 defaults to device name)","config_show_model":"Show model as subtitle","config_show_header":"Show header with input stats","error_no_device":"Please select a device","section_usbc":"USB-C","section_usba":"USB-A","gauge_of":"of","active_ports":"Active Ports","load":"Load","volume":"Volume","vol_low":"Low","vol_medium":"Med","vol_high":"High","sound_mute":"Muted","sound_low":"Low volume","sound_medium":"Medium volume","sound_high":"High volume","balance_channel":"CH","balance_no_pack":"no pack","outdated_standalone_active":"An outdated standalone copy of this card is active. Remove the standalone ISDT Charger Card (see Settings \u2192 Repairs) to use the up-to-date version bundled with the integration.","battair_config_title":"Title (optional, default is BattAir)","battair_config_sort":"Sort by","battair_sort_name":"Name","battair_sort_charge":"Charge level (lowest first)","battair_sort_last_seen":"Last seen","battair_config_hide_unavailable":"Hide packs that are out of range","battair_config_show_cycles":"Show charge cycles","battair_empty":"No BattAir packs found. Packs in Bluetooth range are discovered automatically.","battair_all_hidden":"All packs are out of range.","battair_never_seen":"never","battair_error_log":"Error log","battair_low_cell":"Low cell voltage","battair_storage":"Storage discharge","battair_transport":"Transport mode","battair_temperature_alert":"Temperature","battair_last_seen":"Last seen","battair_cycle":"cycle","battair_cycles":"cycles","battair_stat_packs":"Packs","battair_stat_avg":"\xd8 Charge","battair_stat_warnings":"Warnings","battair_stat_away":"Offline","config_show_schedules":"Show schedules (MASS2)","sched_output":"Scheduled output","sched_toggle":"Schedule","sched_window":"Window","sched_on_at":"On","sched_off_at":"Off","sched_days":"Days","sched_close":"Close","sched_chip_on":"on until {time}","sched_chip_waiting":"off, on from {time}","sched_chip_forced":"forced on","sched_chip_none":"no schedule, always on","sched_note_waiting":"on from {time}","sched_note_forced":"forced on","sched_state_on":"Schedule active","sched_state_waiting":"Off by schedule","sched_state_forced":"Forced on","sched_force_on":"Turn on now","sched_force_hint":"Stays on until tomorrow or until you switch back.","sched_force_off":"Back to schedule","sched_back_hint":"The port follows its schedule again.","quiet_hours":"Quiet hours","quiet_toggle":"Active","quiet_time":"Time","quiet_from":"from","quiet_to":"to","quiet_now":"silent now","quiet_hint":"A window past midnight works, e.g. 22:00 to 06:30. The MASS2 does not beep during it.","day_monday":"Monday","day_tuesday":"Tuesday","day_wednesday":"Wednesday","day_thursday":"Thursday","day_friday":"Friday","day_saturday":"Saturday","day_sunday":"Sunday","day_short_monday":"Mo","day_short_tuesday":"Tu","day_short_wednesday":"We","day_short_thursday":"Th","day_short_friday":"Fr","day_short_saturday":"Sa","day_short_sunday":"Su"}');
 
 
 var $238d401f28c1db46$exports = {};
-$238d401f28c1db46$exports = JSON.parse('{"status_empty":"Leer","status_idle":"Bereit","status_charging":"L\xe4dt","status_done":"Fertig","status_error":"Fehler","header_input":"Input","header_current":"Strom","header_power":"Leistung","header_total_charge":"\u03A3 Ladung","info_volt":"Volt","info_amp":"Amp","info_time":"Zeit","info_type":"Typ","tooltip_connected":"Verbunden","tooltip_disconnected":"Getrennt","config_title":"Titel (optional \u2013 Standard ist Ger\xe4tename)","config_show_model":"Modell als Untertitel anzeigen","config_show_header":"Header mit Eingangswerten anzeigen","error_no_device":"Bitte ein Ger\xe4t ausw\xe4hlen","section_usbc":"USB-C","section_usba":"USB-A","gauge_of":"von","active_ports":"Aktive Ports","load":"Auslastung","volume":"Lautst\xe4rke","vol_low":"Leise","vol_medium":"Mittel","vol_high":"Laut","sound_mute":"Stumm","sound_low":"Leise","sound_medium":"Mittel","sound_high":"Laut","balance_channel":"Kanal","balance_no_pack":"kein Akku","outdated_standalone_active":"Eine veraltete separate Kopie dieser Karte ist aktiv. Entferne die separate ISDT Charger Card (siehe Einstellungen \u2192 Reparaturen), um die aktuelle, mit der Integration gelieferte Version zu nutzen.","battair_config_title":"Titel (optional, Standard ist BattAir)","battair_config_sort":"Sortierung","battair_sort_name":"Name","battair_sort_charge":"Ladestand (niedrigster zuerst)","battair_sort_last_seen":"Zuletzt gesehen","battair_config_hide_unavailable":"Packs au\xdfer Reichweite ausblenden","battair_config_show_cycles":"Ladezyklen anzeigen","battair_empty":"Keine BattAir-Packs gefunden. Packs in Bluetooth-Reichweite werden automatisch erkannt.","battair_all_hidden":"Alle Packs sind au\xdfer Reichweite.","battair_never_seen":"nie","battair_error_log":"Fehlerprotokoll","battair_low_cell":"Zellspannung niedrig","battair_storage":"Lagerentladung","battair_transport":"Transportmodus","battair_temperature_alert":"Temperatur","battair_last_seen":"Zuletzt gesehen","battair_cycle":"Zyklus","battair_cycles":"Zyklen","battair_stat_packs":"Packs","battair_stat_avg":"\xd8 Ladung","battair_stat_warnings":"Warnungen","battair_stat_away":"Offline"}');
+$238d401f28c1db46$exports = JSON.parse('{"status_empty":"Leer","status_idle":"Bereit","status_charging":"L\xe4dt","status_done":"Fertig","status_error":"Fehler","header_input":"Input","header_current":"Strom","header_power":"Leistung","header_total_charge":"\u03A3 Ladung","info_volt":"Volt","info_amp":"Amp","info_time":"Zeit","info_type":"Typ","tooltip_connected":"Verbunden","tooltip_disconnected":"Getrennt","config_title":"Titel (optional \u2013 Standard ist Ger\xe4tename)","config_show_model":"Modell als Untertitel anzeigen","config_show_header":"Header mit Eingangswerten anzeigen","error_no_device":"Bitte ein Ger\xe4t ausw\xe4hlen","section_usbc":"USB-C","section_usba":"USB-A","gauge_of":"von","active_ports":"Aktive Ports","load":"Auslastung","volume":"Lautst\xe4rke","vol_low":"Leise","vol_medium":"Mittel","vol_high":"Laut","sound_mute":"Stumm","sound_low":"Leise","sound_medium":"Mittel","sound_high":"Laut","balance_channel":"Kanal","balance_no_pack":"kein Akku","outdated_standalone_active":"Eine veraltete separate Kopie dieser Karte ist aktiv. Entferne die separate ISDT Charger Card (siehe Einstellungen \u2192 Reparaturen), um die aktuelle, mit der Integration gelieferte Version zu nutzen.","battair_config_title":"Titel (optional, Standard ist BattAir)","battair_config_sort":"Sortierung","battair_sort_name":"Name","battair_sort_charge":"Ladestand (niedrigster zuerst)","battair_sort_last_seen":"Zuletzt gesehen","battair_config_hide_unavailable":"Packs au\xdfer Reichweite ausblenden","battair_config_show_cycles":"Ladezyklen anzeigen","battair_empty":"Keine BattAir-Packs gefunden. Packs in Bluetooth-Reichweite werden automatisch erkannt.","battair_all_hidden":"Alle Packs sind au\xdfer Reichweite.","battair_never_seen":"nie","battair_error_log":"Fehlerprotokoll","battair_low_cell":"Zellspannung niedrig","battair_storage":"Lagerentladung","battair_transport":"Transportmodus","battair_temperature_alert":"Temperatur","battair_last_seen":"Zuletzt gesehen","battair_cycle":"Zyklus","battair_cycles":"Zyklen","battair_stat_packs":"Packs","battair_stat_avg":"\xd8 Ladung","battair_stat_warnings":"Warnungen","battair_stat_away":"Offline","config_show_schedules":"Zeitpl\xe4ne anzeigen (MASS2)","sched_output":"Geplante Ausgabe","sched_toggle":"Zeitplan","sched_window":"Zeitfenster","sched_on_at":"An","sched_off_at":"Aus","sched_days":"Tage","sched_close":"Schlie\xdfen","sched_chip_on":"an bis {time}","sched_chip_waiting":"aus, an ab {time}","sched_chip_forced":"manuell an","sched_chip_none":"kein Zeitplan, immer an","sched_note_waiting":"an ab {time}","sched_note_forced":"manuell an","sched_state_on":"Zeitplan aktiv","sched_state_waiting":"Durch Zeitplan aus","sched_state_forced":"Manuell an","sched_force_on":"Jetzt einschalten","sched_force_hint":"Bleibt an bis morgen oder bis du zur\xfcckschaltest.","sched_force_off":"Zur\xfcck zum Zeitplan","sched_back_hint":"Der Port folgt wieder seinem Zeitplan.","quiet_hours":"Ruhezeit","quiet_toggle":"Aktiv","quiet_time":"Zeit","quiet_from":"von","quiet_to":"bis","quiet_now":"gerade stumm","quiet_hint":"\xdcber Mitternacht geht, z. B. 22:00 bis 06:30. In dieser Zeit piept der MASS2 nicht.","day_monday":"Montag","day_tuesday":"Dienstag","day_wednesday":"Mittwoch","day_thursday":"Donnerstag","day_friday":"Freitag","day_saturday":"Samstag","day_sunday":"Sonntag","day_short_monday":"Mo","day_short_tuesday":"Di","day_short_wednesday":"Mi","day_short_thursday":"Do","day_short_friday":"Fr","day_short_saturday":"Sa","day_short_sunday":"So"}');
 
 
 // Helpers shared by the charger and the BattAir card. No JSON imports here,
@@ -111,6 +111,79 @@ function $d8078e452c66bdbe$export$625550452a3fa3ec(hass, key) {
 
 
 
+/**
+ * MASS2 schedules in the card: quiet hours (header sound popover) and the
+ * scheduled output of the USB-C ports (popup under a port tile).
+ *
+ * Entities come from the isdt_air_ble integration:
+ *   switch  scheduled_output / quiet_hours      on/off
+ *   time    scheduled_output_on/_off,
+ *           quiet_hours_start/_end              window
+ *   select  scheduled_output_days /
+ *           quiet_hours_days                    attribute `days`
+ *   switch  force_on                            keep a port on now
+ *   sensor  schedule_state                      none | on | waiting | forced
+ * Days are written with the `isdt_air_ble.set_schedule` action, so any
+ * combination works.
+ */ 
+const $6770c3493bdef5a7$export$ecc24ef5795d74f8 = [
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday'
+];
+function $6770c3493bdef5a7$export$e3a0becd172ec013(state) {
+    return /^\d{2}:\d{2}/.test(state || '') ? state.slice(0, 5) : '';
+}
+function $6770c3493bdef5a7$var$minutes(t) {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+}
+function $6770c3493bdef5a7$export$cc285f638b0bf87c(start, end, days, now = new Date()) {
+    if (!start || !end) return false;
+    const a = $6770c3493bdef5a7$var$minutes(start), b = $6770c3493bdef5a7$var$minutes(end);
+    const m = now.getHours() * 60 + now.getMinutes();
+    const today = $6770c3493bdef5a7$export$ecc24ef5795d74f8[(now.getDay() + 6) % 7];
+    const yesterday = $6770c3493bdef5a7$export$ecc24ef5795d74f8[(now.getDay() + 5) % 7];
+    if (a < b) return days.includes(today) && m >= a && m < b;
+    return days.includes(today) && m >= a || days.includes(yesterday) && m < b;
+}
+function $6770c3493bdef5a7$export$c042bcc40faacfc(tr, s) {
+    const off = s.on ? '' : ' sched-disabled';
+    const chips = $6770c3493bdef5a7$export$ecc24ef5795d74f8.map((d)=>{
+        const sel = s.days.includes(d);
+        return `<button class="day-chip ${sel ? 'sel' : ''}" data-sched="${s.key}"
+      data-act="day" data-day="${d}" aria-pressed="${sel}"
+      title="${(0, $b724747388f32094$export$a1a11b095f88289a)(tr('day_' + d))}">${(0, $b724747388f32094$export$a1a11b095f88289a)(tr('day_short_' + d))}</button>`;
+    }).join('');
+    return `
+    <div class="sched-row">
+      <span class="sched-lab">${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.toggle)}</span>
+      <label class="sched-toggle">
+        <input type="checkbox" data-sched="${s.key}" data-act="toggle"
+          ${s.on ? 'checked' : ''} aria-label="${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.toggle)}">
+        <span></span>
+      </label>
+    </div>
+    <div class="sched-row${off}">
+      <span class="sched-lab">${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.times)}</span>
+      <span class="sched-tl">${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.a)}</span>
+      <input class="sched-time" type="time" data-sched="${s.key}" data-act="start"
+        value="${(0, $b724747388f32094$export$a1a11b095f88289a)(s.start)}" aria-label="${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.a)}">
+      <span class="sched-tl">${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.b)}</span>
+      <input class="sched-time" type="time" data-sched="${s.key}" data-act="end"
+        value="${(0, $b724747388f32094$export$a1a11b095f88289a)(s.end)}" aria-label="${(0, $b724747388f32094$export$a1a11b095f88289a)(s.labels.b)}">
+    </div>
+    <div class="sched-row${off}">
+      <span class="sched-lab">${(0, $b724747388f32094$export$a1a11b095f88289a)(tr('sched_days'))}</span>
+      <div class="day-chips">${chips}</div>
+    </div>`;
+}
+
+
 // Written by the release sync script (isdt_air_ble scripts/sync_card.sh).
 const $8ee5ce714273e53b$export$d5e7ce6d07daf10f = "0.15.1";
 const $8ee5ce714273e53b$export$9b657414b7dffe40 = "bundled";
@@ -153,7 +226,8 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         const labels = {
             title: "config_title",
             show_model: "config_show_model",
-            show_header: "config_show_header"
+            show_header: "config_show_header",
+            show_schedules: "config_show_schedules"
         };
         return {
             computeLabel: (schema)=>labels[schema.name] ? (0, $d8078e452c66bdbe$export$625550452a3fa3ec)((0, $b724747388f32094$export$9fb280befa7ef4fc)(), labels[schema.name]) : undefined,
@@ -194,6 +268,13 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
                     selector: {
                         boolean: {}
                     }
+                },
+                {
+                    name: "show_schedules",
+                    selector: {
+                        boolean: {}
+                    },
+                    default: true
                 }
             ]
         };
@@ -422,6 +503,18 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
                 case "volume":
                     main.volume = entityId;
                     break;
+                case "quiet_hours":
+                    main.quiet_hours = entityId;
+                    break;
+                case "quiet_hours_start":
+                    main.quiet_hours_start = entityId;
+                    break;
+                case "quiet_hours_end":
+                    main.quiet_hours_end = entityId;
+                    break;
+                case "quiet_hours_days":
+                    main.quiet_hours_days = entityId;
+                    break;
                 case "port_status":
                     {
                         let n = null;
@@ -460,6 +553,24 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
                         break;
                     case "port_active":
                         ports[n].active = entityId;
+                        break;
+                    case "schedule_state":
+                        ports[n].schedule = entityId;
+                        break;
+                    case "scheduled_output":
+                        ports[n].sched_on = entityId;
+                        break;
+                    case "scheduled_output_on":
+                        ports[n].sched_start = entityId;
+                        break;
+                    case "scheduled_output_off":
+                        ports[n].sched_end = entityId;
+                        break;
+                    case "scheduled_output_days":
+                        ports[n].sched_days = entityId;
+                        break;
+                    case "force_on":
+                        ports[n].force_on = entityId;
                         break;
                 }
             }
@@ -555,6 +666,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             card.innerHTML = this._html();
             root.appendChild(card);
             this._bind(card);
+            if (this._entities.type === "adapter") this._schedUpdate();
         } else this._updateDynamic();
     }
     _html() {
@@ -1039,6 +1151,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         h += '<div class="port-grid usb-a">';
         for(let n = 7; n <= 8; n++)h += this._portHTML(n);
         h += "</div>";
+        h += '<div class="sched-pop" role="dialog" hidden></div>';
         h += "</div>";
         return h;
     }
@@ -1100,7 +1213,10 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
                       title="${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sound_" + soundState))}">
                 <ha-icon class="sound-btn-icon" icon="${soundIcon}"></ha-icon>
               </button>
-              <div class="sound-popover">${popoverOpts}</div>
+              <div class="sound-popover">
+                <div class="sound-opts">${popoverOpts}</div>
+                <div class="quiet-host"></div>
+              </div>
             </div>
             <svg class="more-info-btn" viewBox="0 0 24 24" fill="currentColor" stroke="none">
               <circle cx="12" cy="5" r="1.5"/>
@@ -1157,15 +1273,22 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
         // there's nothing meaningful to show).
         let badgeHTML = "";
         if (kind === "C") {
-            const badge = this._protoBadge(port, state);
+            let badge = this._protoBadge(port, state);
+            const sst = this._schedState(port);
+            if ((sst === "waiting" || sst === "forced") && badge.cls === "off") badge = {
+                label: "",
+                cls: "none"
+            };
             badgeHTML = `<span class="proto-badge proto-${badge.cls}" data-entity="${port?.protocol || ""}">${badge.label}</span>`;
         }
+        const sched = kind === "C" && this._schedSupported(port);
         return `
-      <div class="port ${state}" data-port="${n}">
+      <div class="port ${state}" data-port="${n}" ${sched ? `data-sched-port="${n}" role="button" tabindex="0" aria-haspopup="dialog"` : ""}>
         <div class="port-head">
           <div class="port-num">
             <ha-icon class="port-icon" icon="${iconName}"></ha-icon>
             <span>${(0, $b724747388f32094$export$a1a11b095f88289a)(port?.label)}</span>
+            ${sched ? '<span class="sched-icon"></span>' : ""}
           </div>
           ${badgeHTML}
         </div>
@@ -1174,8 +1297,283 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
           <span data-entity="${port?.voltage || ""}">${this._fmt(v, 2)} V</span>
           <span data-entity="${port?.current || ""}">${this._fmt(a, 2)} A</span>
         </div>
+        ${sched ? '<div class="port-note"></div>' : ""}
         <div class="port-bar"><div class="port-bar-fill" style="width:${barPct}%"></div></div>
       </div>`;
+    }
+    /* ── MASS2 schedules (quiet hours + per-port scheduled output) ── */ _schedShown() {
+        return this._config?.show_schedules !== false;
+    }
+    _schedSupported(port) {
+        return this._schedShown() && !!port?.sched_on;
+    }
+    /** none | on | waiting | forced, from the device-reported sensor. */ _schedState(port) {
+        if (!this._schedSupported(port)) return "none";
+        const s = this._st(port.schedule, "none");
+        return [
+            "on",
+            "waiting",
+            "forced"
+        ].includes(s) ? s : "none";
+    }
+    _schedOf(key) {
+        const { main: main, ports: ports } = this._entities;
+        const e = key === "q" ? {
+            sw: main.quiet_hours,
+            start: main.quiet_hours_start,
+            end: main.quiet_hours_end,
+            days: main.quiet_hours_days
+        } : (()=>{
+            const p = ports[Number(key.slice(1))] || {};
+            return {
+                sw: p.sched_on,
+                start: p.sched_start,
+                end: p.sched_end,
+                days: p.sched_days,
+                force: p.force_on
+            };
+        })();
+        const daysAttr = this._hass.states[e.days]?.attributes?.days;
+        return {
+            ...e,
+            key: key,
+            on: this._st(e.sw, "off") === "on",
+            startV: (0, $6770c3493bdef5a7$export$e3a0becd172ec013)(this._st(e.start, "")),
+            endV: (0, $6770c3493bdef5a7$export$e3a0becd172ec013)(this._st(e.end, "")),
+            daysV: Array.isArray(daysAttr) ? daysAttr : []
+        };
+    }
+    _schedIcon(state) {
+        const icon = {
+            on: "mdi:clock-outline",
+            waiting: "mdi:timer-off-outline",
+            forced: "mdi:hand-back-right-outline"
+        }[state];
+        return icon ? `<ha-icon icon="${icon}"></ha-icon>` : "";
+    }
+    _schedChip(state, sc) {
+        const text = {
+            on: this._t("sched_chip_on").replace("{time}", sc.endV),
+            waiting: this._t("sched_chip_waiting").replace("{time}", sc.startV),
+            forced: this._t("sched_chip_forced"),
+            none: this._t("sched_chip_none")
+        }[state];
+        return `<span class="sched-chip ${state}">${this._schedIcon(state)}${(0, $b724747388f32094$export$a1a11b095f88289a)(text)}</span>`;
+    }
+    /** Port tiles, the open port popup and the quiet hours section. */ _schedUpdate() {
+        const root = this.shadowRoot;
+        if (!root || this._entities?.type !== "adapter") return;
+        const { ports: ports } = this._entities;
+        for(let n = 1; n <= 6; n++){
+            const portEl = root.querySelector(`[data-sched-port="${n}"]`);
+            if (!portEl) continue;
+            const port = ports[n];
+            const st = this._schedState(port);
+            portEl.classList.toggle("sched-waiting", st === "waiting");
+            portEl.classList.toggle("sched-forced", st === "forced");
+            portEl.classList.toggle("sched-open", this._schedPort === n);
+            const iconEl = portEl.querySelector(".sched-icon");
+            if (iconEl) {
+                iconEl.className = `sched-icon ${st}`;
+                iconEl.innerHTML = this._schedIcon(st);
+                iconEl.title = st === "none" ? "" : this._t("sched_state_" + st);
+            }
+            const note = portEl.querySelector(".port-note");
+            if (note) {
+                const sc = st === "waiting" ? this._schedOf("p" + n) : null;
+                note.textContent = st === "waiting" ? this._t("sched_note_waiting").replace("{time}", sc.startV) : st === "forced" ? this._t("sched_note_forced") : "";
+            }
+        }
+        this._renderSchedPop();
+        this._renderQuiet();
+    }
+    /** Re-render a popup only while nobody is typing in one of its fields. */ _editing(el) {
+        const active = this.shadowRoot?.activeElement;
+        return !!(active && el.contains(active) && active.matches("input[type=time]"));
+    }
+    _renderSchedPop() {
+        const root = this.shadowRoot;
+        const pop = root?.querySelector(".sched-pop");
+        if (!pop) return;
+        const n = this._schedPort;
+        const port = n ? this._entities.ports[n] : null;
+        if (!n || !this._schedSupported(port)) {
+            pop.hidden = true;
+            pop.innerHTML = "";
+            this._schedPopHtml = null;
+            return;
+        }
+        if (!pop.hidden && pop.dataset.port === String(n) && this._editing(pop)) return;
+        const st = this._schedState(port);
+        const sc = this._schedOf("p" + n);
+        let action = "";
+        if (st === "waiting" && sc.force) action = `<button class="sched-btn force" data-sched="p${n}" data-act="force-on">
+          <ha-icon icon="mdi:hand-back-right-outline"></ha-icon>${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sched_force_on"))}</button>
+        <span class="sched-hint">${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sched_force_hint"))}</span>`;
+        else if (st === "forced" && sc.force) action = `<button class="sched-btn back" data-sched="p${n}" data-act="force-off">
+          <ha-icon icon="mdi:clock-outline"></ha-icon>${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sched_force_off"))}</button>
+        <span class="sched-hint">${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sched_back_hint"))}</span>`;
+        const html = `
+      <div class="sched-title">
+        <span class="sched-name">${(0, $b724747388f32094$export$a1a11b095f88289a)(port.label)} \xb7 ${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sched_output"))}</span>
+        ${this._schedChip(st, sc)}
+        <button class="sched-close" data-act="close" title="${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sched_close"))}"
+          aria-label="${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("sched_close"))}"><ha-icon icon="mdi:close"></ha-icon></button>
+      </div>
+      ${(0, $6770c3493bdef5a7$export$c042bcc40faacfc)((k)=>this._t(k), {
+            key: "p" + n,
+            on: sc.on,
+            start: sc.startV,
+            end: sc.endV,
+            days: sc.daysV,
+            labels: {
+                toggle: this._t("sched_toggle"),
+                times: this._t("sched_window"),
+                a: this._t("sched_on_at"),
+                b: this._t("sched_off_at")
+            }
+        })}
+      ${action ? `<div class="sched-actions">${action}</div>` : ""}`;
+        // Only touch the DOM when something changed, so a click is never lost
+        // to a re-render between mousedown and mouseup.
+        if (pop.hidden || pop.dataset.port !== String(n) || this._schedPopHtml !== html) {
+            pop.dataset.port = String(n);
+            pop.innerHTML = html;
+            this._schedPopHtml = html;
+        }
+        pop.hidden = false;
+        this._placeSchedPop(pop, n);
+    }
+    _placeSchedPop(pop, n) {
+        const card = this.shadowRoot.querySelector(".adapter-card");
+        const tile = this.shadowRoot.querySelector(`[data-port="${n}"]`);
+        if (!card || !tile) return;
+        const c = card.getBoundingClientRect();
+        const t = tile.getBoundingClientRect();
+        const w = pop.offsetWidth;
+        const centre = t.left - c.left + t.width / 2;
+        const left = Math.max(12, Math.min(c.width - w - 12, centre - w / 2));
+        pop.style.left = `${left}px`;
+        pop.style.top = `${t.bottom - c.top + 10}px`;
+        pop.style.setProperty("--caret", `${centre - left}px`);
+    }
+    _renderQuiet() {
+        const host = this.shadowRoot?.querySelector(".quiet-host");
+        if (!host) return;
+        const { main: main } = this._entities;
+        const btn = this.shadowRoot.querySelector(".sound-btn");
+        if (!this._schedShown() || !main.quiet_hours) {
+            host.innerHTML = "";
+            this._quietHtml = null;
+            btn?.classList.remove("quiet");
+            return;
+        }
+        const sc = this._schedOf("q");
+        const now = sc.on && (0, $6770c3493bdef5a7$export$cc285f638b0bf87c)(sc.startV, sc.endV, sc.daysV);
+        if (btn) {
+            btn.classList.toggle("quiet", now);
+            const iconEl = btn.querySelector(".sound-btn-icon");
+            if (now && iconEl) iconEl.setAttribute("icon", "mdi:bell-sleep-outline");
+        }
+        if (this._editing(host)) return;
+        const html = `
+      <div class="quiet-sep"></div>
+      <div class="quiet-title"><ha-icon icon="mdi:bell-sleep-outline"></ha-icon>${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("quiet_hours"))}
+        ${now ? `<span class="sched-chip forced">${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("quiet_now"))}</span>` : ""}</div>
+      ${(0, $6770c3493bdef5a7$export$c042bcc40faacfc)((k)=>this._t(k), {
+            key: "q",
+            on: sc.on,
+            start: sc.startV,
+            end: sc.endV,
+            days: sc.daysV,
+            labels: {
+                toggle: this._t("quiet_toggle"),
+                times: this._t("quiet_time"),
+                a: this._t("quiet_from"),
+                b: this._t("quiet_to")
+            }
+        })}
+      <span class="sched-hint">${(0, $b724747388f32094$export$a1a11b095f88289a)(this._t("quiet_hint"))}</span>`;
+        if (host.innerHTML === "" || this._quietHtml !== html) {
+            host.innerHTML = html;
+            this._quietHtml = html;
+        }
+    }
+    _bindSchedules(card, soundWrap) {
+        if (this._entities?.type !== "adapter") return;
+        const open = (n)=>{
+            this._schedPort = this._schedPort === n ? null : n;
+            this._schedUpdate();
+        };
+        card.querySelectorAll("[data-sched-port]").forEach((el)=>{
+            const n = Number(el.dataset.schedPort);
+            el.addEventListener("click", (e)=>{
+                e.stopPropagation();
+                open(n);
+            });
+            el.addEventListener("keydown", (e)=>{
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    open(n);
+                }
+            });
+        });
+        // Close the port popup on a click elsewhere in the card.
+        card.addEventListener("click", (e)=>{
+            const pop = card.querySelector(".sched-pop");
+            if (this._schedPort && pop && !pop.contains(e.target)) {
+                this._schedPort = null;
+                this._schedUpdate();
+            }
+        });
+        card.addEventListener("click", (e)=>{
+            const el = e.target.closest("[data-act]");
+            if (!el || el.matches("input")) return;
+            e.stopPropagation();
+            this._schedAction(el);
+        });
+        card.addEventListener("change", (e)=>{
+            const el = e.target.closest("input[data-act]");
+            if (el) this._schedAction(el);
+        });
+    }
+    _schedAction(el) {
+        const act = el.dataset.act;
+        if (act === "close") {
+            this._schedPort = null;
+            this._schedUpdate();
+            return;
+        }
+        const sc = this._schedOf(el.dataset.sched || "");
+        const call = (domain, service, data)=>this._hass.callService(domain, service, data);
+        if (act === "toggle" && sc.sw) call("switch", el.checked ? "turn_on" : "turn_off", {
+            entity_id: sc.sw
+        });
+        else if ((act === "start" || act === "end") && el.value) {
+            const eid = act === "start" ? sc.start : sc.end;
+            if (eid) call("time", "set_value", {
+                entity_id: eid,
+                time: `${el.value}:00`
+            });
+        } else if (act === "day" && sc.sw) {
+            const day = el.dataset.day;
+            const days = sc.daysV.includes(day) ? sc.daysV.filter((d)=>d !== day) : [
+                ...sc.daysV,
+                day
+            ];
+            if (!days.length) return; // at least one day; a schedule without days runs once only
+            days.sort((a, b)=>(0, $6770c3493bdef5a7$export$ecc24ef5795d74f8).indexOf(a) - (0, $6770c3493bdef5a7$export$ecc24ef5795d74f8).indexOf(b));
+            el.classList.toggle("sel"); // instant feedback until the state arrives
+            call("isdt_air_ble", "set_schedule", {
+                entity_id: sc.sw,
+                days: days
+            });
+        } else if (act === "force-on" && sc.force) call("switch", "turn_on", {
+            entity_id: sc.force
+        });
+        else if (act === "force-off" && sc.force) call("switch", "turn_off", {
+            entity_id: sc.force
+        });
     }
     _adapterUpdateDynamic() {
         const root = this.shadowRoot;
@@ -1237,7 +1635,14 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             // Protocol badge only exists for USB-C ports (see _portHTML).
             const badgeEl = portEl.querySelector(".proto-badge");
             if (badgeEl) {
-                const badge = this._protoBadge(port, state);
+                // "OFF" would be wrong for a port the schedule holds off (it has a
+                // note instead) and for a forced port (it is on, just unloaded).
+                const sst = this._schedState(port);
+                let badge = this._protoBadge(port, state);
+                if ((sst === "waiting" || sst === "forced") && badge.cls === "off") badge = {
+                    label: "",
+                    cls: "none"
+                };
                 badgeEl.className = `proto-badge proto-${badge.cls}`;
                 badgeEl.textContent = badge.label;
             }
@@ -1248,6 +1653,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
             if (barFill) barFill.style.width = `${barPct}%`;
         }
         this._setField(root, "active-count", `${activeCount} / 8`);
+        this._schedUpdate();
     }
     _navigateToDevice() {
         const deviceId = this._config?.device_id;
@@ -1467,9 +1873,12 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
                 soundWrap?.classList.remove("open");
             });
         });
+        this._bindSchedules(card, soundWrap);
         card.querySelectorAll("[data-entity]").forEach((el)=>{
             if (!el.dataset.entity) return;
             if (el.classList.contains("sound-btn")) return; // handled above
+            // A tap on a port with a schedule opens its popup instead.
+            if (el.closest("[data-sched-port]")) return;
             el.addEventListener("click", (e)=>{
                 e.stopPropagation();
                 const ev = new Event("hass-more-info", {
@@ -1858,7 +2267,7 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
     .sound-popover {
       position: absolute; top: calc(100% + 6px); right: 0;
       display: none;
-      flex-direction: row; gap: 2px; padding: 4px;
+      flex-direction: column; gap: 2px; padding: 4px;
       background: var(--ha-card-background, var(--card-background-color, #fff));
       border: 1px solid var(--divider-color, #e0e0e0);
       border-radius: 10px;
@@ -1866,6 +2275,122 @@ class $9a3262f48b2f355e$export$fda68d6dc0a4d865 extends HTMLElement {
       z-index: 10;
     }
     .sound-wrap.open .sound-popover { display: flex; }
+    .sound-opts { display: flex; flex-direction: row; gap: 2px; }
+    .sound-btn.quiet { color: #7e57c2; opacity: 0.9; }
+
+    /* \u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550} MASS2 schedules \u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550} */
+    .adapter-card { position: relative; }
+    .port[data-sched-port]:focus-visible { outline: 2px solid var(--primary-color, #03a9f4); outline-offset: 2px; }
+    .sched-icon { display: inline-flex; }
+    .sched-icon ha-icon { --mdc-icon-size: 14px; }
+    .sched-icon.on { color: var(--secondary-text-color); }
+    .sched-icon.waiting { color: #b7862b; }
+    .sched-icon.forced { color: #7e57c2; }
+    .port-note { font-size: 10.5px; font-weight: 600; min-height: 0; margin-bottom: 6px; }
+    .port-note:empty { display: none; }
+    .port.sched-waiting {
+      opacity: 1;
+      border-style: dashed; border-color: #d9a441;
+      background: rgba(255, 179, 0, 0.12);
+    }
+    .port.sched-waiting .port-watts { color: var(--disabled-text-color, #bdbdbd); }
+    .port.sched-waiting .port-vi { display: none; }
+    .port.sched-waiting .port-note { color: #b7862b; }
+    .port.sched-forced { border-color: #7e57c2; box-shadow: inset 0 0 0 1px #7e57c2; }
+    .port.sched-forced .port-note { color: #7e57c2; }
+    .port.sched-forced.off, .port.sched-forced.idle { opacity: 1; }
+    .port.sched-forced.off .port-vi { display: none; }
+    .port.sched-open { box-shadow: 0 0 0 2px var(--primary-color, #03a9f4); }
+
+    .sched-pop {
+      position: absolute; z-index: 6;
+      width: min(360px, calc(100% - 24px)); box-sizing: border-box;
+      padding: 12px 14px 14px;
+      background: var(--ha-card-background, var(--card-background-color, #fff));
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .sched-pop[hidden] { display: none; }
+    .sched-pop::before {
+      content: ''; position: absolute; top: -7px; left: var(--caret, 50%);
+      width: 12px; height: 12px;
+      background: var(--ha-card-background, var(--card-background-color, #fff));
+      border-left: 1px solid var(--divider-color, #e0e0e0);
+      border-top: 1px solid var(--divider-color, #e0e0e0);
+      transform: translateX(-50%) rotate(45deg);
+    }
+    .sched-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .sched-name { font-weight: 700; font-size: 14px; }
+    .sched-close {
+      margin-left: auto; background: none; border: none; cursor: pointer;
+      color: var(--secondary-text-color); padding: 2px; border-radius: 6px; display: flex;
+    }
+    .sched-close:hover { background: var(--secondary-background-color); }
+    .sched-close ha-icon { --mdc-icon-size: 18px; }
+    .sched-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px;
+    }
+    .sched-chip ha-icon { --mdc-icon-size: 13px; }
+    .sched-chip.on { background: rgba(76,175,80,0.15); color: #2e7d32; }
+    .sched-chip.waiting { background: rgba(255,179,0,0.16); color: #9a6f1f; }
+    .sched-chip.forced { background: rgba(126,87,194,0.15); color: #7e57c2; }
+    .sched-chip.none { background: var(--secondary-background-color); color: var(--secondary-text-color); }
+    .sched-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .sched-row.sched-disabled { opacity: 0.45; pointer-events: none; }
+    .sched-lab { font-size: 12px; color: var(--secondary-text-color); width: 64px; flex-shrink: 0; }
+    .sched-tl { font-size: 11px; color: var(--secondary-text-color); }
+    .sched-time {
+      font-family: ui-monospace, 'Roboto Mono', monospace; font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      background: var(--secondary-background-color, rgba(0,0,0,0.04));
+      color: var(--primary-text-color);
+      border: 1px solid var(--divider-color, #e0e0e0); border-radius: 8px;
+      padding: 4px 6px; color-scheme: light dark;
+    }
+    .sched-toggle { position: relative; width: 34px; height: 20px; flex-shrink: 0; }
+    .sched-toggle input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+    .sched-toggle span {
+      position: absolute; inset: 0; border-radius: 10px; pointer-events: none;
+      background: var(--disabled-text-color, #bdbdbd); transition: background 0.2s;
+    }
+    .sched-toggle span::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 14px; height: 14px; border-radius: 50%; background: #fff;
+      transition: transform 0.2s;
+    }
+    .sched-toggle input:checked + span { background: var(--primary-color, #03a9f4); }
+    .sched-toggle input:checked + span::after { transform: translateX(14px); }
+    .sched-toggle input:focus-visible + span { outline: 2px solid var(--primary-color, #03a9f4); outline-offset: 2px; }
+    .day-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+    .day-chip {
+      width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      background: var(--secondary-background-color, rgba(0,0,0,0.04));
+      color: var(--secondary-text-color); font-size: 11px; font-weight: 700; padding: 0;
+    }
+    .day-chip.sel { background: var(--primary-color, #03a9f4); border-color: var(--primary-color, #03a9f4); color: #fff; }
+    .sched-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .sched-btn {
+      display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+      border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 12.5px; font-weight: 600;
+    }
+    .sched-btn ha-icon { --mdc-icon-size: 16px; }
+    .sched-btn.force { background: #7e57c2; color: #fff; border: none; }
+    .sched-btn.back {
+      background: var(--secondary-background-color); color: var(--primary-text-color);
+      border: 1px solid var(--divider-color, #e0e0e0);
+    }
+    .sched-hint { font-size: 11px; color: var(--secondary-text-color); line-height: 1.4; }
+    .quiet-host { width: min(320px, 80vw); display: flex; flex-direction: column; gap: 8px; padding: 0 6px; }
+    .quiet-host:empty { display: none; }
+    .quiet-sep { height: 1px; background: var(--divider-color, #e0e0e0); margin: 4px -6px 2px; }
+    .quiet-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+    .quiet-title ha-icon { --mdc-icon-size: 16px; color: #7e57c2; }
+    .quiet-host .sched-lab { width: 44px; }
+    .quiet-host .sched-hint { padding-bottom: 6px; }
     .sound-opt {
       background: transparent; border: none; cursor: pointer;
       padding: 6px 8px; border-radius: 6px;

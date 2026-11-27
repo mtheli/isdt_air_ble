@@ -9,6 +9,7 @@ from .const import (
     RESP_WORKSTATE,
     RESP_IR,
     RESP_MASS2_SETTINGS,
+    RESP_MASS2_USB_SCHEDULES,
     RESP_MASS2_WORK_STATUS,
     RESP_PS200_DC_STATUS,
     RESP_PS200_WORK_STATUS,
@@ -20,8 +21,12 @@ from .const import (
     CAMERA_CHARGER_MODELS,
     CAMERA_WORK_STATE_MAP,
     CAMERA_BATTERY_TYPE_MAP,
+    CMD_MASS2_FORCE_ON,
+    CMD_MASS2_USB_SCHEDULES_SET,
     MASS2_PORT_COUNT,
     MASS2_PROTOCOL_MAP,
+    MASS2_REPEAT_ENABLED,
+    MASS2_SCHEDULE_PORT_COUNT,
     PS200_DC_STATUS_CHANNEL_SIZE,
     PS200_PHONE_BRANDS,
     PS200_PORT_COUNT,
@@ -583,19 +588,24 @@ def _is_placeholder_device_id(raw_id: bytes) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def parse_mass2_responses(responses: list[bytes]) -> tuple[dict | None, dict | None]:
+def parse_mass2_responses(
+    responses: list[bytes],
+) -> tuple[dict | None, dict | None, list[dict] | None]:
     """Parse MASS2 BLE notification responses.
 
     Returns:
-        (ports, settings)
+        (ports, settings, schedules)
         ports: dict {port (int): {key: value, ...}} when at least one valid
                WorkStatusResp was parsed; None otherwise.
         settings: dict with device settings when at least one SettingsResp
                   was parsed; None otherwise.
+        schedules: list of the six USB-C port schedules when a USB schedules
+                   response (0xC7) was parsed; None otherwise.
     """
     ports: dict = {p: {} for p in range(MASS2_PORT_COUNT)}
     ports_valid = False
     settings: dict | None = None
+    schedules: list[dict] | None = None
 
     for raw in responses:
         _LOGGER.debug("RAW BLE DATA from MASS2 (%d bytes): %s", len(raw), raw.hex(" "))
@@ -612,10 +622,14 @@ def parse_mass2_responses(responses: list[bytes]) -> tuple[dict | None, dict | N
             parsed_settings = _parse_mass2_settings(raw)
             if parsed_settings is not None:
                 settings = parsed_settings
+        elif cmd == RESP_MASS2_USB_SCHEDULES:
+            parsed_schedules = parse_mass2_usb_schedules(raw)
+            if parsed_schedules is not None:
+                schedules = parsed_schedules
         else:
             _LOGGER.debug("Unknown MASS2 CMD 0x%02x: %s", cmd, raw.hex(" "))
 
-    return (ports if ports_valid else None, settings)
+    return (ports if ports_valid else None, settings, schedules)
 
 
 def _parse_mass2_work_status(data: bytes, parsed: dict) -> bool:
@@ -633,8 +647,9 @@ def _parse_mass2_work_status(data: bytes, parsed: dict) -> bool:
       Per port (7 bytes each, starting at byte 3):
         +0: status   (uint8) — 1 means actively delivering power
         +1: protocol (uint8: 0=none, 1=PD, 2=fast_charge)
-        +2: flags    (uint8) — semantics unclear; stored internally as
-                     alarm indicator but never surfaced to the user
+        +2: schedule state (uint8): 0 = no schedule, 1 = schedule on and
+                     inside its window, 2 = schedule on and outside its
+                     window (port off), 3 = forced on (see MASS2_SCHEDULE_*)
         +3-4: voltage (uint16 LE, mV)
         +5-6: current (uint16 LE, mA)
     """
@@ -674,6 +689,7 @@ def _parse_mass2_work_status(data: bytes, parsed: dict) -> bool:
             "protocol": protocol,
             "protocol_str": MASS2_PROTOCOL_MAP.get(protocol, "none"),
             "alarm": alarm,
+            "schedule_state": alarm,
             "voltage": voltage,
             "current": current,
             "power": power,
@@ -734,6 +750,34 @@ def _parse_mass2_settings(data: bytes) -> dict | None:
         settings["operationSoundRepeatDay"],
     )
     return settings
+
+
+def parse_mass2_usb_schedules(data: bytes) -> list[dict] | None:
+    """Parse the MASS2 USB schedules response (CMD 0xC7).
+
+    Format: 31 C7, then 6 x 5 bytes for USB-C1..C6:
+      repeat (bit 7 = schedule on, bits 0-6 = Monday..Sunday),
+      on time [hour, minute], off time [hour, minute].
+    Times are kept as ``hour | minute << 8`` like the settings parser.
+    """
+    expected = 2 + MASS2_SCHEDULE_PORT_COUNT * 5
+    if len(data) < expected:
+        _LOGGER.warning(
+            "Incomplete MASS2 USB schedules response: %d bytes (need %d)",
+            len(data), expected,
+        )
+        return None
+    schedules = []
+    pos = 2
+    for _ in range(MASS2_SCHEDULE_PORT_COUNT):
+        schedules.append({
+            "repeat": data[pos],
+            "openingTime": int.from_bytes(data[pos + 1 : pos + 3], "little"),
+            "closingTime": int.from_bytes(data[pos + 3 : pos + 5], "little"),
+        })
+        pos += 5
+    _LOGGER.debug("MASS2 USB schedules: %s", schedules)
+    return schedules
 
 
 # ---------------------------------------------------------------------------
@@ -943,6 +987,27 @@ def build_mass2_settings_set_req(settings: dict) -> bytearray:
     while len(cmd) < 21:
         cmd.append(0)
     return cmd
+
+
+def build_mass2_usb_schedules_set_req(schedules: list[dict]) -> bytearray:
+    """Build the USB schedules write (CMD 0x12 0xC4) for all six ports."""
+    if len(schedules) != MASS2_SCHEDULE_PORT_COUNT:
+        raise ValueError(
+            f"need {MASS2_SCHEDULE_PORT_COUNT} port schedules, got {len(schedules)}"
+        )
+    cmd = bytearray(CMD_MASS2_USB_SCHEDULES_SET)
+    for sched in schedules:
+        cmd.append(sched.get("repeat", 0) & 0xFF)
+        cmd += int(sched.get("openingTime", 0)).to_bytes(2, "little")
+        cmd += int(sched.get("closingTime", 0)).to_bytes(2, "little")
+    return cmd
+
+
+def build_mass2_force_on_req(port: int) -> bytearray:
+    """Build the force-on request (CMD 0x12 0xCC) for USB-C port 1..6."""
+    if not 1 <= port <= MASS2_SCHEDULE_PORT_COUNT:
+        raise ValueError(f"port must be 1..{MASS2_SCHEDULE_PORT_COUNT}, got {port}")
+    return bytearray([0x12, CMD_MASS2_FORCE_ON, MASS2_REPEAT_ENABLED | port])
 
 
 def build_mass2_set_time_req(now, tz_offset_hours: int, is_24h: bool = True) -> bytearray:

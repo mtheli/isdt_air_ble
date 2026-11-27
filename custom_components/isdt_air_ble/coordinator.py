@@ -20,6 +20,7 @@ from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import BluetoothCallbackMatcher
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_call_later
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -36,6 +37,7 @@ from .const import (
     CMD_HARDWARE_INFO_REQ,
     CMD_IR_REQ,
     CMD_MASS2_SETTINGS_REQ,
+    CMD_MASS2_USB_SCHEDULES_REQ,
     CMD_MASS2_WORK_STATUS_REQ,
     CMD_PS200_DC_STATUS_REQ,
     CMD_PS200_WORK_STATUS_REQ,
@@ -50,11 +52,15 @@ from .const import (
     DeviceType,
     MASS2_FRAME_HEADER,
     MASS2_PORT_COUNT,
+    MASS2_REPEAT_ENABLED,
+    MASS2_SCHEDULE_PORT_COUNT,
     PS200_DC_STATUS_CHANNEL_SIZE,
     PS200_WORK_STATUS_CHANNEL_SIZE,
     RESP_ALARM_TONE,
     RESP_BIND,
+    RESP_MASS2_ACKS,
     RESP_MASS2_SETTINGS,
+    RESP_MASS2_USB_SCHEDULES,
     RESP_MASS2_WORK_STATUS,
     RESP_PS200_DC_STATUS,
     RESP_PS200_WORK_STATUS,
@@ -64,8 +70,10 @@ from .const import (
 )
 from .parser import (
     ChargerValueHold,
+    build_mass2_force_on_req,
     build_mass2_set_time_req,
     build_mass2_settings_set_req,
+    build_mass2_usb_schedules_set_req,
     parse_charger_responses,
     clear_empty_slots,
     parse_hardware_info,
@@ -255,6 +263,11 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
         self._mass2_settings: dict | None = None
         self._mass2_settings_requested = False
 
+        # Cached MASS2 USB-C port schedules (6 entries, cmd 0xC7). Read on
+        # every connect because the vendor app may have changed them.
+        self._mass2_usb_schedules: list[dict] | None = None
+        self._mass2_usb_schedules_requested = False
+
         # Live monitoring
         self._connection_lock = asyncio.Lock()
         self._live_task: asyncio.Task | None = None
@@ -300,6 +313,11 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
     def mass2_settings(self) -> dict | None:
         """Return cached MASS2 device settings (adapter only)."""
         return self._mass2_settings
+
+    @property
+    def mass2_usb_schedules(self) -> list[dict] | None:
+        """Return cached MASS2 USB-C port schedules (adapter only)."""
+        return self._mass2_usb_schedules
 
     @property
     def entities_available(self) -> bool:
@@ -648,17 +666,28 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             self._apply_phantom_filter(parsed_ports)
             parsed = parsed_ports
         elif self.device_type == DeviceType.ADAPTER:
-            parsed_ports, parsed_settings = parse_mass2_responses(responses)
+            parsed_ports, parsed_settings, parsed_schedules = (
+                parse_mass2_responses(responses)
+            )
             if parsed_settings is not None:
                 self._mass2_settings = parsed_settings
                 _LOGGER.debug("MASS2 settings updated from device")
+            if parsed_schedules is not None:
+                self._mass2_usb_schedules = parsed_schedules
+                _LOGGER.debug("MASS2 USB schedules updated from device")
             if parsed_ports is None:
                 # No complete WorkStatus response — keep existing data
                 # instead of overwriting it with empty values. Push current
                 # data anyway so settings entities update.
-                if parsed_settings is not None and self.data:
+                if (
+                    parsed_settings is not None or parsed_schedules is not None
+                ) and self.data:
                     self.async_set_updated_data(self.data)
                 return
+            if parsed_schedules is not None:
+                # Settings-only changes don't alter the port data, so the
+                # change detection would swallow the push.
+                self._last_pushed_data = None
             self._apply_phantom_filter(parsed_ports)
             parsed = parsed_ports
         else:
@@ -880,6 +909,7 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
             # Reset reassembly buffer + settings request flag on every (re)connect
             self._mass2_buffer = bytearray()
             self._mass2_settings_requested = False
+            self._mass2_usb_schedules_requested = False
             self._charger_hold.reset()
             await asyncio.sleep(1.0)
 
@@ -914,6 +944,19 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                     "settings request",
                 )
                 self._mass2_settings_requested = True
+
+            if (
+                self.adapter_protocol == AdapterProtocol.MASS2
+                and not self._mass2_usb_schedules_requested
+            ):
+                _LOGGER.debug("Sending MASS2 USB schedules request")
+                await self._gatt(
+                    self._client.write_gatt_char(
+                        CHAR_UUID_AF01, CMD_MASS2_USB_SCHEDULES_REQ, response=False
+                    ),
+                    "USB schedules request",
+                )
+                self._mass2_usb_schedules_requested = True
 
             # For MASS2 adapters: push current wall-clock time so per-port
             # schedules and alarm clocks fire at the correct times even
@@ -1056,6 +1099,12 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
                 expected = 7 + total_channels * PS200_DC_STATUS_CHANNEL_SIZE
             elif cmd == RESP_ALARM_TONE:
                 # AlarmToneResp: frame header, cmd word, state byte.
+                expected = 3
+            elif cmd == RESP_MASS2_USB_SCHEDULES:
+                # 6 ports x (repeat, on[h,m], off[h,m])
+                expected = 2 + MASS2_SCHEDULE_PORT_COUNT * 5
+            elif cmd in RESP_MASS2_ACKS:
+                # 31 <cmd> 01 — set/force/time acknowledgements
                 expected = 3
             else:
                 # Unknown cmd word. We don't know the length, so log and
@@ -1293,6 +1342,84 @@ class ISDTDataUpdateCoordinator(DataUpdateCoordinator):
     async def async_set_mass2_volume(self, value: int) -> None:
         """Set the MASS2 buzzer volume (0=low, 1=medium, 2=high)."""
         await self._async_send_mass2_settings({"volume": value})
+
+    async def async_set_mass2_quiet_hours(self, **updates) -> None:
+        """Update the quiet hours (mute timer) fields.
+
+        Accepts ``operationSoundRepeatDay``, ``openingTime`` and
+        ``closingTime``. All other settings fields are sent unchanged.
+        """
+        await self._async_send_mass2_settings(updates)
+
+    # ------------------------------------------------------------------
+    # MASS2 USB-C port schedules and force-on
+    # ------------------------------------------------------------------
+
+    async def _async_write_mass2_usb_schedules(self, schedules: list[dict]) -> None:
+        """Send the full six-port schedule block (caller holds the lock)."""
+        cmd = build_mass2_usb_schedules_set_req(schedules)
+        _LOGGER.debug("Sending MASS2 USB schedules: %s", cmd.hex(" "))
+        await self._gatt(
+            self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False),
+            "USB schedules write",
+        )
+
+    async def async_set_mass2_usb_schedule(self, port: int, **updates) -> None:
+        """Update one USB-C port schedule (port 1..6) and send all six.
+
+        Accepts ``repeat``, ``openingTime`` and ``closingTime``. The other
+        five ports go out exactly as last read from the device.
+        """
+        if self._mass2_usb_schedules is None:
+            raise HomeAssistantError("USB schedules not yet read from the device")
+        if not 1 <= port <= MASS2_SCHEDULE_PORT_COUNT:
+            raise ValueError(f"port must be 1..{MASS2_SCHEDULE_PORT_COUNT}")
+
+        async with self._connection_lock:
+            if not self._client or not self._client.is_connected:
+                raise HomeAssistantError("Not connected")
+            schedules = [dict(s) for s in self._mass2_usb_schedules]
+            schedules[port - 1].update(updates)
+            await self._async_write_mass2_usb_schedules(schedules)
+            self._mass2_usb_schedules = schedules
+            # Switching a schedule off also ends a force-on; the next
+            # WorkStatus brings the new state, until then keep it unknown
+            # rather than stale.
+            self._last_pushed_data = None
+            if self.data:
+                self.async_set_updated_data(self.data)
+
+    async def async_mass2_force_on(self, port: int) -> None:
+        """Force USB-C port 1..6 on while its schedule keeps it off."""
+        async with self._connection_lock:
+            if not self._client or not self._client.is_connected:
+                raise HomeAssistantError("Not connected")
+            cmd = build_mass2_force_on_req(port)
+            _LOGGER.debug("Sending MASS2 force-on: %s", cmd.hex(" "))
+            await self._gatt(
+                self._client.write_gatt_char(CHAR_UUID_AF01, cmd, response=False),
+                "force-on write",
+            )
+
+    async def async_mass2_end_force_on(self, port: int) -> None:
+        """End a force-on on USB-C port 1..6.
+
+        The firmware has no "off" command for force-on; it clears the flag
+        when the port's schedule is switched off. So the schedule is sent
+        once with bit 7 cleared for this port and then restored. Each write
+        is stored in the device flash.
+        """
+        if self._mass2_usb_schedules is None:
+            raise HomeAssistantError("USB schedules not yet read from the device")
+        async with self._connection_lock:
+            if not self._client or not self._client.is_connected:
+                raise HomeAssistantError("Not connected")
+            original = [dict(s) for s in self._mass2_usb_schedules]
+            cleared = [dict(s) for s in original]
+            cleared[port - 1]["repeat"] &= ~MASS2_REPEAT_ENABLED & 0xFF
+            await self._async_write_mass2_usb_schedules(cleared)
+            await asyncio.sleep(0.5)
+            await self._async_write_mass2_usb_schedules(original)
 
     async def _send_mass2_set_time(self) -> None:
         """Push the current local wall-clock time to the device RTC.
