@@ -50,6 +50,13 @@ For the MASS2 the same card shows total power and load, plus one tile per USB po
 | :---: | :---: |
 | <a href="images/mass2_card.png"><img src="images/mass2_card.png" alt="ISDT Charger Card for the MASS2" width="414"></a> | <a href="images/mass2_card_dark.png"><img src="images/mass2_card_dark.png" alt="ISDT Charger Card for the MASS2, dark theme" width="414"></a> |
 
+Clicking a USB-C tile opens the port's schedule. The tiles show the schedule state: a clock while it runs, a dashed border with the next on time while the port waits, a hand while it is forced on. The speaker icon in the header holds the buzzer volume and the quiet hours.
+
+| Port schedule | Quiet hours |
+| :---: | :---: |
+| <a href="images/mass2_schedule.png"><img src="images/mass2_schedule.png" alt="Port schedule popup of the MASS2 card" width="414"></a> | <a href="images/mass2_quiet_hours.png"><img src="images/mass2_quiet_hours.png" alt="Quiet hours in the sound popover of the MASS2 card" width="414"></a> |
+| <a href="images/mass2_schedule_dark.png"><img src="images/mass2_schedule_dark.png" alt="Port schedule popup of the MASS2 card, dark theme" width="414"></a> | <a href="images/mass2_quiet_hours_dark.png"><img src="images/mass2_quiet_hours_dark.png" alt="Quiet hours in the sound popover of the MASS2 card, dark theme" width="414"></a> |
+
 ### BattAir card
 
 A second card, `custom:isdt-battair-card`, lists all BattAir packs and plugins on one card, one line per pack. Packs with a problem (error log, low cell voltage, temperature below 5 °C or above 45 °C) move to the top with the problem in red; storage discharge and transport mode show as icons. Packs that are out of range stay in the list with the time they were last seen. It finds the packs by itself, no configuration needed: add **ISDT BattAir Card** from the dashboard card picker (it is also suggested when you add a card for a BattAir entity), or in YAML:
@@ -176,6 +183,8 @@ are read-only.
 | Schedule | Enum | `none`, `on` (inside the window), `waiting` (outside the window), `forced` |
 
 #### Quiet hours and port schedules
+
+The card shows and edits both, see [Lovelace Card](#lovelace-card).
 
 The days select only offers the three presets. For any other combination of days, use the **Set schedule** action
 (`isdt_air_ble.set_schedule`) on the *Quiet hours* switch or on a port's *Scheduled output* switch:
